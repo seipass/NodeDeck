@@ -14049,8 +14049,31 @@ function isMetricSnapshot(value) {
         return false;
     const cpu = value.data.cpu;
     const memory = value.data.memory;
-    return isRecord(cpu) && isFiniteNumber(cpu.usagePercent) && isFiniteNumber(cpu.load1) && isFiniteNumber(cpu.load5) && isFiniteNumber(cpu.load15) && isFiniteNumberArray(cpu.cores) && isRecord(memory) && isFiniteNumber(memory.usedBytes) && isFiniteNumber(memory.availableBytes) && isFiniteNumber(memory.usedPercent) && isFiniteNumber(memory.swapUsedBytes) && isFiniteNumber(memory.swapUsedPercent);
+    return isRecord(cpu) && isFiniteNumber(cpu.usagePercent) && isFiniteNumber(cpu.load1) && isFiniteNumber(cpu.load5) && isFiniteNumber(cpu.load15) && isFiniteNumberArray(cpu.cores) && isRecord(memory) && isFiniteNumber(memory.usedBytes) && isFiniteNumber(memory.availableBytes) && isFiniteNumber(memory.usedPercent) && isFiniteNumber(memory.swapUsedBytes) && isFiniteNumber(memory.swapUsedPercent) && isOptionalArray(value.data.temperature, isTemperature) && isOptionalArray(value.data.disks, isDisk) && isOptionalArray(value.data.network, isNetwork) && isOptionalArray(value.data.services, isService) && isOptionalArray(value.data.docker, isDocker) && isOptionalArray(value.data.custom, isCustom);
 }
+function isOptionalArray(value, itemGuard) {
+    return value === undefined || Array.isArray(value) && value.every(itemGuard);
+}
+function isTemperature(value) {
+    return isRecord(value) && typeof value.sensor === "string" && isFiniteNumber(value.celsius);
+}
+function isDisk(value) {
+    return isRecord(value) && typeof value.mountpoint === "string" && isFiniteNumber(value.usedBytes) && isFiniteNumber(value.freeBytes) && isFiniteNumber(value.usedPercent) && isFiniteNumber(value.readBytesPerSecond) && isFiniteNumber(value.writeBytesPerSecond);
+}
+function isNetwork(value) {
+    return isRecord(value) && typeof value.interface === "string" && isFiniteNumber(value.rxBytesPerSecond) && isFiniteNumber(value.txBytesPerSecond) && isFiniteNumber(value.rxBytes) && isFiniteNumber(value.txBytes);
+}
+function isService(value) {
+    return isRecord(value) && typeof value.name === "string" && typeof value.loadState === "string" && typeof value.activeState === "string" && typeof value.subState === "string";
+}
+function isDocker(value) {
+    return isRecord(value) && typeof value.id === "string" && typeof value.name === "string" && typeof value.state === "string" && isOptionalFiniteNumber(value.uptimeSeconds) && isOptionalFiniteNumber(value.cpuPercent) && isOptionalFiniteNumber(value.memoryUsageBytes) && isOptionalFiniteNumber(value.memoryLimitBytes);
+}
+function isCustom(value) {
+    return isRecord(value) && typeof value.id === "string" && typeof value.status === "string" && typeof value.exitCode === "number" && Number.isInteger(value.exitCode) && isOptionalString(value.value) && isOptionalString(value.stdout) && isOptionalString(value.stderr) && isOptionalString(value.lastSuccessAt);
+}
+function isOptionalFiniteNumber(value) { return value === undefined || isFiniteNumber(value); }
+function isOptionalString(value) { return value === undefined || typeof value === "string"; }
 function isHelloAck(value) {
     if (!isRecord(value) || value.type !== "hello_ack" || value.protocol !== "streamdeck-monitor" || value.version !== 1 || !Array.isArray(value.capabilities))
         return false;
