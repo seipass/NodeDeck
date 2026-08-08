@@ -13,6 +13,7 @@
     }
   ],
   "Category": "NodeDeck Monitor",
+  "CategoryIcon": "imgs/metric-display",
   "Software": {
     "MinimumVersion": "7.1"
   },
