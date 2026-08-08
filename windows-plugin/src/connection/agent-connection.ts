@@ -16,16 +16,25 @@ export class AgentConnection {
 
   public constructor(private readonly url: string, private readonly token: string) {}
 
+  public getToken(): string { return this.token; }
+
   public start(): void { if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) return; this.connect(); }
 
-  public reconnect(): void { this.socket?.close(); this.socket = undefined; this.authenticated = false; this.start(); }
-
-  public stop(): void {
-    if (this.timer !== undefined) clearTimeout(this.timer);
+  public reconnect(): void {
+    this.clearReconnectTimer();
+    this.clearStaleTimer();
     this.socket?.close();
     this.socket = undefined;
     this.authenticated = false;
-    if (this.staleTimer !== undefined) clearInterval(this.staleTimer);
+    this.start();
+  }
+
+  public stop(): void {
+    this.clearReconnectTimer();
+    this.socket?.close();
+    this.socket = undefined;
+    this.authenticated = false;
+    this.clearStaleTimer();
   }
 
   public on(listener: Listener): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
@@ -39,7 +48,6 @@ export class AgentConnection {
     socket.on("open", () => {
       if (generation !== this.generation) return;
       socket.send(JSON.stringify({ type: "hello", protocol: "streamdeck-monitor", version: 1, token: this.token }));
-      socket.send(JSON.stringify({ type: "subscribe", metrics: ["cpu", "memory"] }));
       this.staleTimer = setInterval(() => { if (this.state === "online") { this.state = "metric-unavailable"; this.notify(); } }, 5_000);
     });
     socket.on("message", (raw: Buffer) => {
@@ -50,6 +58,7 @@ export class AgentConnection {
         this.retryMs = 1_000;
         this.state = "online";
         this.notify();
+        socket.send(JSON.stringify({ type: "subscribe", metrics: ["cpu", "memory"] }));
       }
       if (message?.type === "metrics" && this.authenticated) { this.state = "online"; this.notify(message); }
       if (message?.type === "error") { this.state = message.code === "AUTH_FAILED" ? "authentication-error" : "agent-error"; this.notify(); if (message.code === "AUTH_FAILED") socket.close(); }
@@ -67,4 +76,18 @@ export class AgentConnection {
   }
 
   private notify(snapshot?: MetricSnapshot): void { for (const listener of this.listeners) listener(this.state, snapshot); }
+
+  private clearStaleTimer(): void {
+    if (this.staleTimer !== undefined) {
+      clearInterval(this.staleTimer);
+      this.staleTimer = undefined;
+    }
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.timer !== undefined) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+  }
 }

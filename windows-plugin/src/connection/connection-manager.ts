@@ -6,7 +6,11 @@ export class ConnectionManager {
   public get(host: string, port: number, token: string): AgentConnection {
     const key = `${host}:${port}`;
     const existing = this.connections.get(key);
-    if (existing !== undefined) return existing;
+    if (existing !== undefined) {
+      if (existing.getToken() === token) return existing;
+      existing.stop();
+      this.connections.delete(key);
+    }
     const connection = new AgentConnection(`ws://${host}:${port}/ws`, token);
     this.connections.set(key, connection);
     connection.start();
