@@ -2,7 +2,14 @@ package metrics
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/hasilan/node-deck/linux-agent/internal/config"
 )
 
 func TestRateCalculatesCounterDeltaPerSecond(t *testing.T) {
@@ -48,5 +55,53 @@ func TestParseMemoryPairConvertsDockerUnits(t *testing.T) {
 func TestParsePercentRemovesSuffix(t *testing.T) {
 	if got := parsePercent("4.25%"); got != 4.25 {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestRunCustomExecutesArgvAndCapturesOutput(t *testing.T) {
+	definition := helperDefinition(t, 500*time.Millisecond, "success")
+	result := runCustom(context.Background(), "players", definition)
+	if result.Status != "ok" || !strings.HasPrefix(result.Value, "42") || result.ExitCode != 0 || result.LastSuccessAt == nil {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestRunCustomReportsTimeout(t *testing.T) {
+	result := runCustom(context.Background(), "players", helperDefinition(t, 20*time.Millisecond, "timeout"))
+	if result.Status != "timeout" {
+		t.Fatalf("status = %q", result.Status)
+	}
+}
+
+func TestRunCustomReportsExitError(t *testing.T) {
+	result := runCustom(context.Background(), "players", helperDefinition(t, 500*time.Millisecond, "error"))
+	if result.Status != "error" || result.ExitCode != 7 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func helperDefinition(t *testing.T, timeout time.Duration, mode string) config.CustomMetric {
+	t.Helper()
+	t.Setenv("NODEDECK_CUSTOM_HELPER", "1")
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return config.CustomMetric{Command: []string{filepath.Clean(executable), "-test.run=TestCustomMetricHelperProcess", "--", mode}, Interval: time.Second, Timeout: timeout, MaxOutputBytes: 64}
+}
+
+func TestCustomMetricHelperProcess(t *testing.T) {
+	if os.Getenv("NODEDECK_CUSTOM_HELPER") != "1" {
+		return
+	}
+	args := os.Args
+	mode := args[len(args)-1]
+	switch mode {
+	case "success":
+		fmt.Fprintln(os.Stdout, "42")
+	case "timeout":
+		time.Sleep(500 * time.Millisecond)
+	case "error":
+		os.Exit(7)
 	}
 }
