@@ -11,6 +11,7 @@ export type MetricSnapshot = Readonly<{
     network?: readonly Readonly<{ interface: string; rxBytesPerSecond: number; txBytesPerSecond: number; rxBytes: number; txBytes: number }>[];
     services?: readonly Readonly<{ name: string; loadState: string; activeState: string; subState: string }>[];
     docker?: readonly Readonly<{ id: string; name: string; state: string }>[];
+    custom?: readonly Readonly<{ id: string; status: string; value?: string; exitCode: number; stdout?: string; stderr?: string; lastSuccessAt?: string }>[];
   }>;
 }>;
 

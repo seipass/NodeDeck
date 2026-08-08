@@ -14,7 +14,7 @@ func TestHandlerPushesMetricsAfterSubscribe(t *testing.T) {
 	store := metrics.NewStore()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go store.Run(ctx, metrics.NewCollector(nil, false), 50*time.Millisecond)
+	go store.Run(ctx, metrics.NewCollector(nil, false, nil), 50*time.Millisecond)
 	server := httptest.NewServer(NewHandler(store, "secret"))
 	defer server.Close()
 	url := "ws" + server.URL[len("http"):] + "/ws"

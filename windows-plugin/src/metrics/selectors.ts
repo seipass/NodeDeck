@@ -1,7 +1,7 @@
 import type { MetricSnapshot } from "../protocol/messages.js";
 
-export type MetricType = "cpu" | "memory" | "temperature" | "disk" | "network" | "service" | "docker";
-export type MetricSettings = Readonly<{ metricType?: MetricType | undefined; device?: string | undefined }>;
+export type MetricType = "cpu" | "memory" | "temperature" | "disk" | "network" | "service" | "docker" | "custom";
+export type MetricSettings = Readonly<{ metricType?: MetricType | undefined; device?: string | undefined; customMetricId?: string | undefined }>;
 export type SelectedMetric = Readonly<{ label: string; value: number; unit: string }>;
 
 export function selectMetric(snapshot: MetricSnapshot, settings: MetricSettings): SelectedMetric | undefined {
@@ -13,6 +13,7 @@ export function selectMetric(snapshot: MetricSnapshot, settings: MetricSettings)
     case "network": { const item = snapshot.data.network?.find((entry) => entry.interface === settings.device) ?? snapshot.data.network?.[0]; return item === undefined ? undefined : rateMetric(item.interface, item.rxBytesPerSecond); }
     case "service": { const item = snapshot.data.services?.find((entry) => entry.name === settings.device) ?? snapshot.data.services?.[0]; return item === undefined ? undefined : { label: item.name, value: item.activeState === "active" ? 1 : 0, unit: item.activeState }; }
     case "docker": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item === undefined ? undefined : { label: item.name, value: item.state === "running" ? 1 : 0, unit: item.state }; }
+    case "custom": { const item = snapshot.data.custom?.find((entry) => entry.id === settings.customMetricId); return item === undefined || item.status !== "ok" ? undefined : { label: item.id, value: Number(item.value ?? 0), unit: "" }; }
     default: return undefined;
   }
 }

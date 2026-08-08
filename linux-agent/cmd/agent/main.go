@@ -52,7 +52,7 @@ func run() error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	collector := metrics.NewCollector(settings.Services, settings.Docker)
+	collector := metrics.NewCollector(settings.Services, settings.Docker, settings.CustomMetrics)
 	store := metrics.NewStore()
 	go store.Run(ctx, collector, settings.Update)
 

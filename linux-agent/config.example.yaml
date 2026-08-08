@@ -7,3 +7,10 @@ services:
   - nginx.service
   - sshd.service
 docker: false
+custom_metrics:
+  minecraft_players:
+    command:
+      - "/usr/local/bin/get-player-count"
+    interval: 5s
+    timeout: 2s
+    max_output_bytes: 65536

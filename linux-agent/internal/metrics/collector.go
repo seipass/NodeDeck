@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"math"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hasilan/node-deck/linux-agent/internal/config"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/mem"
@@ -17,14 +19,15 @@ import (
 )
 
 type Snapshot struct {
-	Timestamp   time.Time     `json:"timestamp"`
-	CPU         CPU           `json:"cpu"`
-	Memory      Memory        `json:"memory"`
-	Temperature []Temperature `json:"temperature,omitempty"`
-	Disks       []Disk        `json:"disks,omitempty"`
-	Network     []Network     `json:"network,omitempty"`
-	Services    []Service     `json:"services,omitempty"`
-	Docker      []Container   `json:"docker,omitempty"`
+	Timestamp   time.Time      `json:"timestamp"`
+	CPU         CPU            `json:"cpu"`
+	Memory      Memory         `json:"memory"`
+	Temperature []Temperature  `json:"temperature,omitempty"`
+	Disks       []Disk         `json:"disks,omitempty"`
+	Network     []Network      `json:"network,omitempty"`
+	Services    []Service      `json:"services,omitempty"`
+	Docker      []Container    `json:"docker,omitempty"`
+	Custom      []CustomMetric `json:"custom,omitempty"`
 }
 
 type CPU struct {
@@ -70,18 +73,29 @@ type Container struct {
 	CPUPercent  string `json:"cpuPercent,omitempty"`
 	MemoryUsage string `json:"memoryUsage,omitempty"`
 }
-
-type Collector struct {
-	mu       sync.Mutex
-	previous time.Time
-	disks    map[string]disk.IOCountersStat
-	network  map[string]net.IOCountersStat
-	services []string
-	docker   bool
+type CustomMetric struct {
+	ID            string     `json:"id"`
+	Status        string     `json:"status"`
+	Value         string     `json:"value,omitempty"`
+	ExitCode      int        `json:"exitCode"`
+	Stdout        string     `json:"stdout,omitempty"`
+	Stderr        string     `json:"stderr,omitempty"`
+	LastSuccessAt *time.Time `json:"lastSuccessAt,omitempty"`
 }
 
-func NewCollector(services []string, dockerEnabled bool) Collector {
-	return Collector{disks: make(map[string]disk.IOCountersStat), network: make(map[string]net.IOCountersStat), services: services, docker: dockerEnabled}
+type Collector struct {
+	mu         sync.Mutex
+	previous   time.Time
+	disks      map[string]disk.IOCountersStat
+	network    map[string]net.IOCountersStat
+	services   []string
+	docker     bool
+	custom     map[string]config.CustomMetric
+	customLast map[string]time.Time
+}
+
+func NewCollector(services []string, dockerEnabled bool, custom map[string]config.CustomMetric) Collector {
+	return Collector{disks: make(map[string]disk.IOCountersStat), network: make(map[string]net.IOCountersStat), services: services, docker: dockerEnabled, custom: custom, customLast: make(map[string]time.Time)}
 }
 
 func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
@@ -109,8 +123,75 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 		CPU:         CPU{UsagePercent: finite(first(usage)), Cores: cores},
 		Memory:      Memory{UsedBytes: memory.Used, AvailableBytes: memory.Available, UsedPercent: finite(memory.UsedPercent)},
 		Temperature: temperatures, Disks: disks, Network: networks,
-		Services: collectServices(c.services), Docker: collectDocker(c.docker),
+		Services: collectServices(c.services), Docker: collectDocker(c.docker), Custom: c.collectCustom(ctx, time.Now()),
 	}, nil
+}
+
+func (c *Collector) collectCustom(parent context.Context, now time.Time) []CustomMetric {
+	results := make([]CustomMetric, 0, len(c.custom))
+	for id, definition := range c.custom {
+		last := c.customLast[id]
+		if !last.IsZero() && now.Sub(last) < definition.Interval {
+			continue
+		}
+		result := runCustom(parent, id, definition)
+		results = append(results, result)
+		if result.LastSuccessAt != nil {
+			c.customLast[id] = *result.LastSuccessAt
+		} else {
+			c.customLast[id] = now
+		}
+	}
+	return results
+}
+
+type cappedBuffer struct {
+	bytes.Buffer
+	limit    int
+	exceeded bool
+}
+
+func (b *cappedBuffer) Write(data []byte) (int, error) {
+	if b.Len()+len(data) > b.limit {
+		b.exceeded = true
+		remaining := b.limit - b.Len()
+		if remaining > 0 {
+			_, _ = b.Buffer.Write(data[:remaining])
+		}
+		return len(data), nil
+	}
+	return b.Buffer.Write(data)
+}
+
+func runCustom(parent context.Context, id string, definition config.CustomMetric) CustomMetric {
+	result := CustomMetric{ID: id, Status: "error", ExitCode: -1}
+	ctx, cancel := context.WithTimeout(parent, definition.Timeout)
+	defer cancel()
+	command := exec.CommandContext(ctx, definition.Command[0], definition.Command[1:]...)
+	stdout := &cappedBuffer{limit: definition.MaxOutputBytes}
+	stderr := &cappedBuffer{limit: definition.MaxOutputBytes}
+	command.Stdout, command.Stderr = stdout, stderr
+	err := command.Run()
+	result.Stdout, result.Stderr = stdout.String(), stderr.String()
+	if stdout.exceeded || stderr.exceeded {
+		result.Status = "output_limit"
+		return result
+	}
+	if ctx.Err() == context.DeadlineExceeded {
+		result.Status = "timeout"
+		return result
+	}
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			result.ExitCode = exitError.ExitCode()
+		}
+		return result
+	}
+	result.Status, result.Value = "ok", strings.TrimSpace(result.Stdout)
+	result.ExitCode = 0
+	success := time.Now().UTC()
+	result.LastSuccessAt = &success
+	return result
 }
 
 func collectServices(names []string) []Service {

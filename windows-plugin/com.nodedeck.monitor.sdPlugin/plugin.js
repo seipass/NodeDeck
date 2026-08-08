@@ -14152,6 +14152,10 @@ function selectMetric(snapshot, settings) {
             const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0];
             return item === undefined ? undefined : { label: item.name, value: item.state === "running" ? 1 : 0, unit: item.state };
         }
+        case "custom": {
+            const item = snapshot.data.custom?.find((entry) => entry.id === settings.customMetricId);
+            return item === undefined || item.status !== "ok" ? undefined : { label: item.id, value: Number(item.value ?? 0), unit: "" };
+        }
         default: return undefined;
     }
 }

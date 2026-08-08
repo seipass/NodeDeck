@@ -30,3 +30,14 @@ func TestLoadRejectsMissingToken(t *testing.T) {
 		t.Fatal("expected missing token error")
 	}
 }
+
+func TestLoadRejectsRelativeCustomCommand(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	contents := []byte("token: secret\ncustom_metrics:\n  players:\n    command: [get-players]\n    interval: 1s\n    timeout: 1s\n")
+	if err := os.WriteFile(path, contents, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected absolute command validation error")
+	}
+}

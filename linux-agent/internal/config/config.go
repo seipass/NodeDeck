@@ -3,17 +3,27 @@ package config
 import (
 	"errors"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Listen   Listen        `yaml:"listen"`
-	Token    string        `yaml:"token"`
-	Update   time.Duration `yaml:"update_interval"`
-	Services []string      `yaml:"services"`
-	Docker   bool          `yaml:"docker"`
+	Listen        Listen                  `yaml:"listen"`
+	Token         string                  `yaml:"token"`
+	Update        time.Duration           `yaml:"update_interval"`
+	Services      []string                `yaml:"services"`
+	Docker        bool                    `yaml:"docker"`
+	CustomMetrics map[string]CustomMetric `yaml:"custom_metrics"`
+}
+
+type CustomMetric struct {
+	Command        []string      `yaml:"command"`
+	Interval       time.Duration `yaml:"interval"`
+	Timeout        time.Duration `yaml:"timeout"`
+	MaxOutputBytes int           `yaml:"max_output_bytes"`
 }
 
 type Listen struct {
@@ -42,6 +52,14 @@ func Load(path string) (Config, error) {
 	}
 	if config.Update <= 0 {
 		return Config{}, errors.New("update_interval must be positive")
+	}
+	for name, metric := range config.CustomMetrics {
+		if strings.TrimSpace(name) == "" || len(metric.Command) == 0 || !filepath.IsAbs(metric.Command[0]) || metric.Timeout <= 0 || metric.Interval <= 0 {
+			return Config{}, errors.New("invalid custom metric: " + name)
+		}
+		if metric.MaxOutputBytes <= 0 {
+			config.CustomMetrics[name] = CustomMetric{Command: metric.Command, Interval: metric.Interval, Timeout: metric.Timeout, MaxOutputBytes: 65536}
+		}
 	}
 	return config, nil
 }

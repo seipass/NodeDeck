@@ -3,7 +3,7 @@ import type { ConnectionManager } from "../connection/connection-manager.js";
 import { renderMetric } from "../rendering/metric-renderer.js";
 import { selectMetric, type MetricSettings } from "../metrics/selectors.js";
 
-type Settings = Readonly<{ host?: string; port?: number; token?: string; metricType?: MetricSettings["metricType"]; device?: string }>;
+type Settings = Readonly<{ host?: string; port?: number; token?: string; metricType?: MetricSettings["metricType"]; device?: string; customMetricId?: string }>;
 
 export class MetricDisplayAction extends SingletonAction<Settings> {
   public constructor(private readonly connections: ConnectionManager) { super(); }

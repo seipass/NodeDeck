@@ -18,12 +18,22 @@ func TestRateRejectsCounterReset(t *testing.T) {
 }
 
 func TestCollectorCollectsOptionalMetrics(t *testing.T) {
-	collector := NewCollector(nil, false)
+	collector := NewCollector(nil, false, nil)
 	snapshot, err := collector.Collect(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if snapshot.Timestamp.IsZero() {
 		t.Fatal("missing timestamp")
+	}
+}
+
+func TestCappedBufferLimitsOutputWithoutFailingProcess(t *testing.T) {
+	buffer := &cappedBuffer{limit: 4}
+	if _, err := buffer.Write([]byte("abcdef")); err != nil {
+		t.Fatal(err)
+	}
+	if buffer.String() != "abcd" || !buffer.exceeded {
+		t.Fatalf("unexpected buffer: %q exceeded=%v", buffer.String(), buffer.exceeded)
 	}
 }
