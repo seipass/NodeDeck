@@ -77,10 +77,10 @@ type Container struct {
 	ID               string  `json:"id"`
 	Name             string  `json:"name"`
 	State            string  `json:"state"`
-	UptimeSeconds    int64   `json:"uptimeSeconds,omitempty"`
-	CPUPercent       float64 `json:"cpuPercent,omitempty"`
-	MemoryUsageBytes uint64  `json:"memoryUsageBytes,omitempty"`
-	MemoryLimitBytes uint64  `json:"memoryLimitBytes,omitempty"`
+	UptimeSeconds    int64   `json:"uptimeSeconds"`
+	CPUPercent       float64 `json:"cpuPercent"`
+	MemoryUsageBytes uint64  `json:"memoryUsageBytes"`
+	MemoryLimitBytes uint64  `json:"memoryLimitBytes"`
 }
 type CustomMetric struct {
 	ID            string     `json:"id"`

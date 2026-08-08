@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,6 +64,18 @@ func TestUptimeSecondsUsesWholeElapsedSeconds(t *testing.T) {
 	now := started.Add(65*time.Second + 900*time.Millisecond)
 	if got := uptimeSeconds(started, now); got != 65 {
 		t.Fatalf("uptime = %d, want 65", got)
+	}
+}
+
+func TestContainerJSONPreservesZeroResourceValues(t *testing.T) {
+	payload, err := json.Marshal(Container{ID: "id", Name: "web", State: "running"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{`"uptimeSeconds":0`, `"cpuPercent":0`, `"memoryUsageBytes":0`, `"memoryLimitBytes":0`} {
+		if !strings.Contains(string(payload), field) {
+			t.Fatalf("payload %s is missing %s", payload, field)
+		}
 	}
 }
 
