@@ -44,3 +44,13 @@ func TestLoadRejectsRelativeCustomCommand(t *testing.T) {
 		t.Fatal("expected absolute command validation error")
 	}
 }
+
+func TestLoadRejectsInvalidListenPort(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("token: secret\nlisten:\n  port: '70000'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected invalid listen port error")
+	}
+}

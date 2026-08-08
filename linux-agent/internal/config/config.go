@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,6 +63,10 @@ func Load(path string) (Config, error) {
 	}
 	if config.Listen.Port == "" {
 		return Config{}, errors.New("listen.port is required")
+	}
+	port, err := strconv.Atoi(config.Listen.Port)
+	if err != nil || port < 1 || port > 65535 {
+		return Config{}, errors.New("listen.port must be between 1 and 65535")
 	}
 	if config.Update <= 0 {
 		return Config{}, errors.New("update_interval must be positive")
