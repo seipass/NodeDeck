@@ -23,7 +23,7 @@ export function selectMetric(snapshot: MetricSnapshot, settings: MetricSettings)
     case "docker-cpu": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item?.cpuPercent === undefined ? undefined : { label: item.name, value: item.cpuPercent, unit: "%" }; }
     case "docker-memory": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item?.memoryUsageBytes === undefined ? undefined : bytesMetric(item.name, item.memoryUsageBytes); }
     case "docker-uptime": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item?.uptimeSeconds === undefined ? undefined : { label: item.name, value: item.uptimeSeconds, unit: "s" }; }
-    case "custom": { const item = snapshot.data.custom?.find((entry) => entry.id === settings.customMetricId); return item === undefined || item.status !== "ok" ? undefined : { label: item.id, value: Number(item.value ?? 0), unit: "" }; }
+    case "custom": { const item = snapshot.data.custom?.find((entry) => entry.id === settings.customMetricId); if (item === undefined || item.status !== "ok") return undefined; const value = Number(item.value ?? 0); return Number.isFinite(value) ? { label: item.id, value, unit: "" } : undefined; }
     default: return undefined;
   }
 }
