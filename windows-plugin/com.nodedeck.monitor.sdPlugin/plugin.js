@@ -14357,6 +14357,14 @@ function bytesMetric(label, bytes) {
     return { label, value: bytes, unit: "B" };
 }
 
+function parseConnectionSettings(settings) {
+    const host = settings.host?.trim() ?? "127.0.0.1";
+    const port = settings.port ?? 8765;
+    if (host.length === 0 || host.length > 253 || /[\\/\s?#@]/u.test(host) || !Number.isInteger(port) || port < 1 || port > 65535)
+        return undefined;
+    return { host, port, token: settings.token ?? "" };
+}
+
 class MetricDisplayAction extends SingletonAction {
     connections;
     subscriptions = new Map();
@@ -14371,11 +14379,14 @@ class MetricDisplayAction extends SingletonAction {
     }
     onDidReceiveSettings(ev) { this.connect(ev.action, ev.payload.settings); }
     connect(action, settings) {
-        const host = settings.host ?? "127.0.0.1";
-        const port = settings.port ?? 8765;
-        const token = settings.token ?? "";
-        const connection = this.connections.get(host, port, token);
         this.subscriptions.get(action.id)?.();
+        this.subscriptions.delete(action.id);
+        const connectionSettings = parseConnectionSettings(settings);
+        if (connectionSettings === undefined) {
+            void action.setImage(renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, "agent-error"));
+            return;
+        }
+        const connection = this.connections.get(connectionSettings.host, connectionSettings.port, connectionSettings.token);
         let lastState;
         let lastValue;
         let lastDisplayValue;

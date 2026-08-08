@@ -2,6 +2,7 @@ import { SingletonAction, type WillAppearEvent, type WillDisappearEvent, type Di
 import type { ConnectionManager } from "../connection/connection-manager.js";
 import { renderMetric } from "../rendering/metric-renderer.js";
 import { selectMetric, type MetricSettings } from "../metrics/selectors.js";
+import { parseConnectionSettings } from "../settings/settings.js";
 
 type Settings = Readonly<{ host?: string; port?: number; token?: string; metricType?: MetricSettings["metricType"]; device?: string; customMetricId?: string; label?: string; unit?: string; decimalPlaces?: number; refreshInterval?: number; warningThreshold?: number; criticalThreshold?: number }>;
 
@@ -16,11 +17,14 @@ export class MetricDisplayAction extends SingletonAction<Settings> {
   }
   public override onDidReceiveSettings(ev: DidReceiveSettingsEvent<Settings>): void { this.connect(ev.action, ev.payload.settings); }
   private connect(action: WillAppearEvent<Settings>["action"], settings: Settings): void {
-    const host = settings.host ?? "127.0.0.1";
-    const port = settings.port ?? 8765;
-    const token = settings.token ?? "";
-    const connection = this.connections.get(host, port, token);
     this.subscriptions.get(action.id)?.();
+    this.subscriptions.delete(action.id);
+    const connectionSettings = parseConnectionSettings(settings);
+    if (connectionSettings === undefined) {
+      void action.setImage(renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, "agent-error"));
+      return;
+    }
+    const connection = this.connections.get(connectionSettings.host, connectionSettings.port, connectionSettings.token);
     let lastState: string | undefined;
     let lastValue: number | undefined;
     let lastDisplayValue: string | undefined;
