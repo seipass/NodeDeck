@@ -108,6 +108,15 @@ func TestRunCustomReportsExitError(t *testing.T) {
 	}
 }
 
+func TestRunCustomReportsOutputLimit(t *testing.T) {
+	definition := helperDefinition(t, 2*time.Second, "large")
+	definition.MaxOutputBytes = 4
+	result := runCustom(context.Background(), "players", definition)
+	if result.Status != "output_limit" || len(result.Stdout) != 4 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
 func helperDefinition(t *testing.T, timeout time.Duration, mode string) config.CustomMetric {
 	t.Helper()
 	t.Setenv("NODEDECK_CUSTOM_HELPER", "1")
@@ -131,5 +140,7 @@ func TestCustomMetricHelperProcess(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 	case "error":
 		os.Exit(7)
+	case "large":
+		fmt.Fprint(os.Stdout, "1234567890")
 	}
 }

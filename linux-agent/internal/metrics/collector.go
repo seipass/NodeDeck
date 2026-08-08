@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"math"
 	"os/exec"
 	"strconv"
@@ -227,6 +228,24 @@ func (b *cappedBuffer) Write(data []byte) (int, error) {
 		return len(data), nil
 	}
 	return b.Buffer.Write(data)
+}
+
+func (b *cappedBuffer) ReadFrom(reader io.Reader) (int64, error) {
+	buffer := make([]byte, 32*1024)
+	var total int64
+	for {
+		count, err := reader.Read(buffer)
+		if count > 0 {
+			_, _ = b.Write(buffer[:count])
+			total += int64(count)
+		}
+		if err == io.EOF {
+			return total, nil
+		}
+		if err != nil {
+			return total, err
+		}
+	}
 }
 
 func runCustom(parent context.Context, id string, definition config.CustomMetric) CustomMetric {
