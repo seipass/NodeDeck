@@ -14048,6 +14048,21 @@ function parseAgentMessage(value) {
     return undefined;
 }
 
+class MetricStore {
+    snapshot;
+    listeners = new Set();
+    get() { return this.snapshot; }
+    update(snapshot) {
+        this.snapshot = snapshot;
+        for (const listener of this.listeners)
+            listener(snapshot);
+    }
+    on(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+    }
+}
+
 const SUBSCRIBED_METRICS = ["cpu", "memory", "temperature", "disk", "network", "services", "docker", "custom"];
 class AgentConnection {
     url;
@@ -14060,6 +14075,7 @@ class AgentConnection {
     authenticated = false;
     staleTimer;
     generation = 0;
+    metricStore = new MetricStore();
     constructor(url, token) {
         this.url = url;
         this.token = token;
@@ -14084,6 +14100,7 @@ class AgentConnection {
         this.clearStaleTimer();
     }
     on(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+    getSnapshot() { return this.metricStore.get(); }
     connect() {
         const generation = ++this.generation;
         this.state = "connecting";
@@ -14119,8 +14136,9 @@ class AgentConnection {
                 socket.send(JSON.stringify({ type: "subscribe", metrics: SUBSCRIBED_METRICS }));
             }
             if (message?.type === "metrics" && this.authenticated) {
+                this.metricStore.update(message);
                 this.state = "online";
-                this.notify(message);
+                this.notify(this.metricStore.get());
             }
             if (message?.type === "error") {
                 this.state = message.code === "AUTH_FAILED" ? "authentication-error" : "agent-error";

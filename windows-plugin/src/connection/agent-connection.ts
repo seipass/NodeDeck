@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import { parseAgentMessage, type MetricSnapshot } from "../protocol/messages.js";
+import { MetricStore } from "../metrics/metric-store.js";
 
 const SUBSCRIBED_METRICS = ["cpu", "memory", "temperature", "disk", "network", "services", "docker", "custom"] as const;
 
@@ -15,6 +16,7 @@ export class AgentConnection {
   private authenticated = false;
   private staleTimer: NodeJS.Timeout | undefined;
   private generation = 0;
+  private readonly metricStore = new MetricStore();
 
   public constructor(private readonly url: string, private readonly token: string) {}
 
@@ -42,6 +44,8 @@ export class AgentConnection {
 
   public on(listener: Listener): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
 
+  public getSnapshot(): MetricSnapshot | undefined { return this.metricStore.get(); }
+
   private connect(): void {
     const generation = ++this.generation;
     this.state = "connecting";
@@ -63,7 +67,11 @@ export class AgentConnection {
         this.notify();
         socket.send(JSON.stringify({ type: "subscribe", metrics: SUBSCRIBED_METRICS }));
       }
-      if (message?.type === "metrics" && this.authenticated) { this.state = "online"; this.notify(message); }
+      if (message?.type === "metrics" && this.authenticated) {
+        this.metricStore.update(message);
+        this.state = "online";
+        this.notify(this.metricStore.get());
+      }
       if (message?.type === "error") { this.state = message.code === "AUTH_FAILED" ? "authentication-error" : "agent-error"; this.notify(); if (message.code === "AUTH_FAILED") socket.close(); }
     });
     socket.on("close", () => { if (generation === this.generation) this.scheduleReconnect(); });
