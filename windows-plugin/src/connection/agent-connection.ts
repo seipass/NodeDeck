@@ -15,6 +15,7 @@ export class AgentConnection {
   private readonly listeners = new Set<Listener>();
   private authenticated = false;
   private staleTimer: NodeJS.Timeout | undefined;
+  private handshakeTimer: NodeJS.Timeout | undefined;
   private generation = 0;
   private readonly metricStore = new MetricStore();
 
@@ -27,6 +28,7 @@ export class AgentConnection {
   public reconnect(): void {
     this.clearReconnectTimer();
     this.clearStaleTimer();
+    this.clearHandshakeTimer();
     this.socket?.close();
     this.socket = undefined;
     this.authenticated = false;
@@ -36,6 +38,7 @@ export class AgentConnection {
   public stop(): void {
     this.generation += 1;
     this.clearReconnectTimer();
+    this.clearHandshakeTimer();
     this.socket?.close();
     this.socket = undefined;
     this.authenticated = false;
@@ -55,12 +58,19 @@ export class AgentConnection {
     socket.on("open", () => {
       if (generation !== this.generation) return;
       socket.send(JSON.stringify({ type: "hello", protocol: "streamdeck-monitor", version: 1, token: this.token }));
+      this.handshakeTimer = setTimeout(() => {
+        if (generation !== this.generation || this.authenticated) return;
+        this.state = "agent-error";
+        this.notify();
+        socket.close();
+      }, 5_000);
       this.staleTimer = setInterval(() => { if (this.state === "online") { this.state = "metric-unavailable"; this.notify(); } }, 5_000);
     });
     socket.on("message", (raw: Buffer) => {
       if (generation !== this.generation) return;
       let message; try { message = parseAgentMessage(JSON.parse(raw.toString()) as unknown); } catch { this.state = "agent-error"; this.notify(); return; }
       if (message?.type === "hello_ack") {
+        this.clearHandshakeTimer();
         this.authenticated = true;
         this.retryMs = 1_000;
         this.state = "online";
@@ -82,6 +92,7 @@ export class AgentConnection {
   private scheduleReconnect(): void {
     if (this.state === "authentication-error" || this.timer !== undefined) return;
     this.clearStaleTimer();
+    this.clearHandshakeTimer();
     this.state = "offline";
     this.notify();
     this.timer = setTimeout(() => {
@@ -97,6 +108,13 @@ export class AgentConnection {
     if (this.staleTimer !== undefined) {
       clearInterval(this.staleTimer);
       this.staleTimer = undefined;
+    }
+  }
+
+  private clearHandshakeTimer(): void {
+    if (this.handshakeTimer !== undefined) {
+      clearTimeout(this.handshakeTimer);
+      this.handshakeTimer = undefined;
     }
   }
 

@@ -14118,6 +14118,7 @@ class AgentConnection {
     listeners = new Set();
     authenticated = false;
     staleTimer;
+    handshakeTimer;
     generation = 0;
     metricStore = new MetricStore();
     constructor(url, token) {
@@ -14130,6 +14131,7 @@ class AgentConnection {
     reconnect() {
         this.clearReconnectTimer();
         this.clearStaleTimer();
+        this.clearHandshakeTimer();
         this.socket?.close();
         this.socket = undefined;
         this.authenticated = false;
@@ -14138,6 +14140,7 @@ class AgentConnection {
     stop() {
         this.generation += 1;
         this.clearReconnectTimer();
+        this.clearHandshakeTimer();
         this.socket?.close();
         this.socket = undefined;
         this.authenticated = false;
@@ -14155,6 +14158,13 @@ class AgentConnection {
             if (generation !== this.generation)
                 return;
             socket.send(JSON.stringify({ type: "hello", protocol: "streamdeck-monitor", version: 1, token: this.token }));
+            this.handshakeTimer = setTimeout(() => {
+                if (generation !== this.generation || this.authenticated)
+                    return;
+                this.state = "agent-error";
+                this.notify();
+                socket.close();
+            }, 5_000);
             this.staleTimer = setInterval(() => { if (this.state === "online") {
                 this.state = "metric-unavailable";
                 this.notify();
@@ -14173,6 +14183,7 @@ class AgentConnection {
                 return;
             }
             if (message?.type === "hello_ack") {
+                this.clearHandshakeTimer();
                 this.authenticated = true;
                 this.retryMs = 1_000;
                 this.state = "online";
@@ -14201,6 +14212,7 @@ class AgentConnection {
         if (this.state === "authentication-error" || this.timer !== undefined)
             return;
         this.clearStaleTimer();
+        this.clearHandshakeTimer();
         this.state = "offline";
         this.notify();
         this.timer = setTimeout(() => {
@@ -14215,6 +14227,12 @@ class AgentConnection {
         if (this.staleTimer !== undefined) {
             clearInterval(this.staleTimer);
             this.staleTimer = undefined;
+        }
+    }
+    clearHandshakeTimer() {
+        if (this.handshakeTimer !== undefined) {
+            clearTimeout(this.handshakeTimer);
+            this.handshakeTimer = undefined;
         }
     }
     clearReconnectTimer() {

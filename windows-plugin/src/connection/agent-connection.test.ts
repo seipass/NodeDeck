@@ -54,4 +54,27 @@ describe("AgentConnection integration", () => {
     connection.stop();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }, 10_000);
+
+  it("leaves connecting state when the agent never completes the handshake", async () => {
+    const server = new WebSocketServer({ port: 0 });
+    const offline = new Promise<void>((resolve) => {
+      server.on("connection", () => undefined);
+      void connectionStateAfterHandshakeTimeout(server, resolve);
+    });
+    await offline;
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }, 8_000);
 });
+
+async function connectionStateAfterHandshakeTimeout(server: WebSocketServer, resolve: () => void): Promise<void> {
+  const address = server.address();
+  if (address === null || typeof address === "string") throw new Error("test server did not expose a port");
+  const connection = new AgentConnection(`ws://127.0.0.1:${address.port}`, "secret");
+  connection.on((state) => {
+    if (state === "offline") {
+      connection.stop();
+      resolve();
+    }
+  });
+  connection.start();
+}
