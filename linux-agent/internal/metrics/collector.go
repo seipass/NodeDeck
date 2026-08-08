@@ -108,10 +108,15 @@ type Collector struct {
 	serviceValues []Service
 	dockerAt      time.Time
 	dockerValues  []Container
+	intervals     config.Intervals
 }
 
 func NewCollector(services []string, dockerEnabled bool, custom map[string]config.CustomMetric) Collector {
-	return Collector{disks: make(map[string]disk.IOCountersStat), network: make(map[string]net.IOCountersStat), services: services, docker: dockerEnabled, custom: custom, customLast: make(map[string]time.Time), customResults: make(map[string]CustomMetric)}
+	return NewCollectorWithIntervals(services, dockerEnabled, custom, config.Defaults().Intervals)
+}
+
+func NewCollectorWithIntervals(services []string, dockerEnabled bool, custom map[string]config.CustomMetric, intervals config.Intervals) Collector {
+	return Collector{disks: make(map[string]disk.IOCountersStat), network: make(map[string]net.IOCountersStat), services: services, docker: dockerEnabled, custom: custom, customLast: make(map[string]time.Time), customResults: make(map[string]CustomMetric), intervals: intervals}
 }
 
 func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
@@ -150,7 +155,7 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 }
 
 func (c *Collector) collectTemperaturesCached(now time.Time) []Temperature {
-	if !c.temperatureAt.IsZero() && now.Sub(c.temperatureAt) < 2*time.Second {
+	if !c.temperatureAt.IsZero() && now.Sub(c.temperatureAt) < c.intervals.Temperature {
 		return c.temperatures
 	}
 	values := collectTemperatures()
@@ -161,7 +166,7 @@ func (c *Collector) collectTemperaturesCached(now time.Time) []Temperature {
 }
 
 func (c *Collector) collectServicesCached(ctx context.Context, now time.Time) []Service {
-	if !c.servicesAt.IsZero() && now.Sub(c.servicesAt) < 5*time.Second {
+	if !c.servicesAt.IsZero() && now.Sub(c.servicesAt) < c.intervals.Services {
 		return c.serviceValues
 	}
 	values := collectServices(ctx, c.services)
@@ -172,7 +177,7 @@ func (c *Collector) collectServicesCached(ctx context.Context, now time.Time) []
 }
 
 func (c *Collector) collectDockerCached(ctx context.Context, now time.Time) []Container {
-	if !c.dockerAt.IsZero() && now.Sub(c.dockerAt) < 2*time.Second {
+	if !c.dockerAt.IsZero() && now.Sub(c.dockerAt) < c.intervals.Docker {
 		return c.dockerValues
 	}
 	values := collectDocker(ctx, c.docker)

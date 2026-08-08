@@ -9,7 +9,7 @@ import (
 
 func TestLoadParsesDurationAndToken(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(path, []byte("listen:\n  host: 127.0.0.1\n  port: '9000'\ntoken: secret\nupdate_interval: 2s\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("listen:\n  host: 127.0.0.1\n  port: '9000'\ntoken: secret\nupdate_interval: 2s\nintervals:\n  temperature: 3s\n  docker: 4s\n  services: 6s\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	config, err := Load(path)
@@ -18,6 +18,9 @@ func TestLoadParsesDurationAndToken(t *testing.T) {
 	}
 	if config.Listen.Port != "9000" || config.Token != "secret" || config.Update != 2*time.Second {
 		t.Fatalf("unexpected config: %+v", config)
+	}
+	if config.Intervals.Temperature != 3*time.Second || config.Intervals.Docker != 4*time.Second || config.Intervals.Services != 6*time.Second {
+		t.Fatalf("unexpected intervals: %+v", config.Intervals)
 	}
 }
 

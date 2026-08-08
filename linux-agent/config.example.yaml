@@ -3,6 +3,10 @@ listen:
   port: "8765"
 token: "replace-with-a-long-random-token"
 update_interval: 1s
+intervals:
+  temperature: 2s
+  docker: 2s
+  services: 5s
 services:
   - nginx.service
   - sshd.service

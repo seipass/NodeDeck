@@ -14,6 +14,7 @@ type Config struct {
 	Listen        Listen                  `yaml:"listen"`
 	Token         string                  `yaml:"token"`
 	Update        time.Duration           `yaml:"update_interval"`
+	Intervals     Intervals               `yaml:"intervals"`
 	Services      []string                `yaml:"services"`
 	Docker        bool                    `yaml:"docker"`
 	CustomMetrics map[string]CustomMetric `yaml:"custom_metrics"`
@@ -37,8 +38,14 @@ type Listen struct {
 	Port string `yaml:"port"`
 }
 
+type Intervals struct {
+	Temperature time.Duration `yaml:"temperature"`
+	Docker      time.Duration `yaml:"docker"`
+	Services    time.Duration `yaml:"services"`
+}
+
 func Defaults() Config {
-	return Config{Listen: Listen{Host: "0.0.0.0", Port: "8765"}, Update: time.Second}
+	return Config{Listen: Listen{Host: "0.0.0.0", Port: "8765"}, Update: time.Second, Intervals: Intervals{Temperature: 2 * time.Second, Docker: 2 * time.Second, Services: 5 * time.Second}}
 }
 
 func Load(path string) (Config, error) {
@@ -58,6 +65,9 @@ func Load(path string) (Config, error) {
 	}
 	if config.Update <= 0 {
 		return Config{}, errors.New("update_interval must be positive")
+	}
+	if config.Intervals.Temperature <= 0 || config.Intervals.Docker <= 0 || config.Intervals.Services <= 0 {
+		return Config{}, errors.New("intervals must be positive")
 	}
 	if (config.TLS.CertFile == "") != (config.TLS.KeyFile == "") {
 		return Config{}, errors.New("tls.cert_file and tls.key_file must be configured together")
