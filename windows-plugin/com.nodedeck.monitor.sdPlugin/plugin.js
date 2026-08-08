@@ -14149,7 +14149,7 @@ class AgentConnection {
         const generation = ++this.generation;
         this.state = "connecting";
         this.notify();
-        const socket = new WebSocket(this.url);
+        const socket = new WebSocket(this.url, { maxPayload: 1 << 20 });
         this.socket = socket;
         socket.on("open", () => {
             if (generation !== this.generation)
