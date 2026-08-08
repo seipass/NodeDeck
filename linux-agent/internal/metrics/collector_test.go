@@ -37,3 +37,16 @@ func TestCappedBufferLimitsOutputWithoutFailingProcess(t *testing.T) {
 		t.Fatalf("unexpected buffer: %q exceeded=%v", buffer.String(), buffer.exceeded)
 	}
 }
+
+func TestParseMemoryPairConvertsDockerUnits(t *testing.T) {
+	used, limit := parseMemoryPair("12.5MiB / 1GiB")
+	if used != 13_107_200 || limit != 1_073_741_824 {
+		t.Fatalf("got %d/%d", used, limit)
+	}
+}
+
+func TestParsePercentRemovesSuffix(t *testing.T) {
+	if got := parsePercent("4.25%"); got != 4.25 {
+		t.Fatalf("got %v", got)
+	}
+}

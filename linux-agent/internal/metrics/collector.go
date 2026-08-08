@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"math"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -67,11 +68,12 @@ type Service struct {
 	SubState    string `json:"subState"`
 }
 type Container struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	State       string `json:"state"`
-	CPUPercent  string `json:"cpuPercent,omitempty"`
-	MemoryUsage string `json:"memoryUsage,omitempty"`
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	State            string  `json:"state"`
+	CPUPercent       float64 `json:"cpuPercent,omitempty"`
+	MemoryUsageBytes uint64  `json:"memoryUsageBytes,omitempty"`
+	MemoryLimitBytes uint64  `json:"memoryLimitBytes,omitempty"`
 }
 type CustomMetric struct {
 	ID            string     `json:"id"`
@@ -84,18 +86,19 @@ type CustomMetric struct {
 }
 
 type Collector struct {
-	mu         sync.Mutex
-	previous   time.Time
-	disks      map[string]disk.IOCountersStat
-	network    map[string]net.IOCountersStat
-	services   []string
-	docker     bool
-	custom     map[string]config.CustomMetric
-	customLast map[string]time.Time
+	mu            sync.Mutex
+	previous      time.Time
+	disks         map[string]disk.IOCountersStat
+	network       map[string]net.IOCountersStat
+	services      []string
+	docker        bool
+	custom        map[string]config.CustomMetric
+	customLast    map[string]time.Time
+	customResults map[string]CustomMetric
 }
 
 func NewCollector(services []string, dockerEnabled bool, custom map[string]config.CustomMetric) Collector {
-	return Collector{disks: make(map[string]disk.IOCountersStat), network: make(map[string]net.IOCountersStat), services: services, docker: dockerEnabled, custom: custom, customLast: make(map[string]time.Time)}
+	return Collector{disks: make(map[string]disk.IOCountersStat), network: make(map[string]net.IOCountersStat), services: services, docker: dockerEnabled, custom: custom, customLast: make(map[string]time.Time), customResults: make(map[string]CustomMetric)}
 }
 
 func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
@@ -135,12 +138,18 @@ func (c *Collector) collectCustom(parent context.Context, now time.Time) []Custo
 			continue
 		}
 		result := runCustom(parent, id, definition)
-		results = append(results, result)
+		if previous, ok := c.customResults[id]; ok && result.LastSuccessAt == nil {
+			result.LastSuccessAt = previous.LastSuccessAt
+		}
+		c.customResults[id] = result
 		if result.LastSuccessAt != nil {
 			c.customLast[id] = *result.LastSuccessAt
 		} else {
 			c.customLast[id] = now
 		}
+	}
+	for _, result := range c.customResults {
+		results = append(results, result)
 	}
 	return results
 }
@@ -263,12 +272,67 @@ func collectDocker(enabled bool) []Container {
 		}
 		for index, container := range containers {
 			if container.Name == item.Name {
-				containers[index].CPUPercent = item.CPU
-				containers[index].MemoryUsage = item.Memory
+				containers[index].CPUPercent = parsePercent(item.CPU)
+				memory, limit := parseMemoryPair(item.Memory)
+				containers[index].MemoryUsageBytes, containers[index].MemoryLimitBytes = memory, limit
 			}
 		}
 	}
 	return containers
+}
+
+func parsePercent(value string) float64 {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimSuffix(value, "%")), 64)
+	if err != nil {
+		return 0
+	}
+	return finite(parsed)
+}
+
+func parseMemoryPair(value string) (uint64, uint64) {
+	parts := strings.Split(value, " /")
+	if len(parts) != 2 {
+		return parseBytes(value), 0
+	}
+	return parseBytes(parts[0]), parseBytes(parts[1])
+}
+
+func parseBytes(value string) uint64 {
+	fields := strings.Fields(strings.TrimSpace(value))
+	if len(fields) == 0 {
+		return 0
+	}
+	numberText := fields[0]
+	unit := "B"
+	if len(fields) > 1 {
+		unit = fields[1]
+	} else {
+		upper := strings.ToUpper(numberText)
+		for _, candidate := range []string{"GIB", "MIB", "KIB", "GB", "MB", "KB", "B"} {
+			if strings.HasSuffix(upper, candidate) {
+				unit = candidate
+				numberText = numberText[:len(numberText)-len(candidate)]
+				break
+			}
+		}
+	}
+	number, err := strconv.ParseFloat(numberText, 64)
+	if err != nil {
+		return 0
+	}
+	multiplier := float64(1)
+	switch strings.ToUpper(unit) {
+	case "KB", "KIB":
+		multiplier = 1024
+	case "MB", "MIB":
+		multiplier = 1024 * 1024
+	case "GB", "GIB":
+		multiplier = 1024 * 1024 * 1024
+	}
+	if number < 0 {
+		return 0
+	}
+	return uint64(number * multiplier)
 }
 
 func validUnit(name string) bool { return name != "" && !strings.ContainsAny(name, "\r\n;|&") }
