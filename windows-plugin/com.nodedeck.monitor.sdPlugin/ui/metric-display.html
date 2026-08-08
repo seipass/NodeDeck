@@ -8,5 +8,10 @@
   <sdpi-item label="Metric"><sdpi-select setting="metricType"><option value="cpu">CPU</option><option value="memory">Memory</option><option value="temperature">Temperature</option><option value="disk">Disk</option><option value="network">Network</option><option value="service">systemd service</option><option value="docker">Docker container</option></sdpi-select></sdpi-item>
   <sdpi-item label="Device"><sdpi-textfield setting="device" placeholder="eth0, /, or sensor"></sdpi-textfield></sdpi-item>
   <sdpi-item label="Custom Metric ID"><sdpi-textfield setting="customMetricId" placeholder="minecraft_players"></sdpi-textfield></sdpi-item>
+  <sdpi-item label="Label"><sdpi-textfield setting="label"></sdpi-textfield></sdpi-item>
+  <sdpi-item label="Unit"><sdpi-textfield setting="unit"></sdpi-textfield></sdpi-item>
+  <sdpi-item label="Decimal Places"><sdpi-number setting="decimalPlaces" min="0" max="6" default="1"></sdpi-number></sdpi-item>
+  <sdpi-item label="Warning Threshold"><sdpi-number setting="warningThreshold"></sdpi-number></sdpi-item>
+  <sdpi-item label="Critical Threshold"><sdpi-number setting="criticalThreshold"></sdpi-number></sdpi-item>
 </body>
 </html>

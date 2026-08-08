@@ -3,7 +3,7 @@ import type { ConnectionManager } from "../connection/connection-manager.js";
 import { renderMetric } from "../rendering/metric-renderer.js";
 import { selectMetric, type MetricSettings } from "../metrics/selectors.js";
 
-type Settings = Readonly<{ host?: string; port?: number; token?: string; metricType?: MetricSettings["metricType"]; device?: string; customMetricId?: string }>;
+type Settings = Readonly<{ host?: string; port?: number; token?: string; metricType?: MetricSettings["metricType"]; device?: string; customMetricId?: string; label?: string; unit?: string; decimalPlaces?: number; warningThreshold?: number; criticalThreshold?: number }>;
 
 export class MetricDisplayAction extends SingletonAction<Settings> {
   private readonly subscriptions = new Map<string, () => void>();
@@ -19,7 +19,7 @@ export class MetricDisplayAction extends SingletonAction<Settings> {
     this.subscriptions.get(action.id)?.();
     this.subscriptions.set(action.id, connection.on((state, snapshot) => {
       const metric = snapshot === undefined ? undefined : selectMetric(snapshot, settings);
-      void action.setImage(metric === undefined ? renderMetric("Metric", 0, "", state === "online" ? "metric-unavailable" : state) : renderMetric(metric.label, metric.value, metric.unit, state));
+      void action.setImage(metric === undefined ? renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, state === "online" ? "metric-unavailable" : state) : renderMetric({ label: settings.label ?? metric.label, value: metric.value, unit: settings.unit ?? metric.unit, decimalPlaces: settings.decimalPlaces ?? 1, warningThreshold: settings.warningThreshold, criticalThreshold: settings.criticalThreshold }, state));
     }));
   }
 }
