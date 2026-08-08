@@ -45,7 +45,7 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		_ = connection.WriteJSON(map[string]string{"type": "error", "code": "AUTH_FAILED"})
 		return
 	}
-	if err := connection.WriteJSON(helloAck{Type: "hello_ack", Protocol: "streamdeck-monitor", Version: 1, Capabilities: []string{"cpu", "memory", "temperature", "disk", "network"}}); err != nil {
+	if err := connection.WriteJSON(helloAck{Type: "hello_ack", Protocol: "streamdeck-monitor", Version: 1, Capabilities: []string{"cpu", "memory", "temperature", "disk", "network", "services", "docker", "custom"}}); err != nil {
 		return
 	}
 	if err := h.runSession(connection); err != nil {
@@ -80,7 +80,7 @@ func (h Handler) runSession(connection *websocket.Conn) error {
 	defer metricsTicker.Stop()
 	heartbeatTicker := time.NewTicker(15 * time.Second)
 	defer heartbeatTicker.Stop()
-	subscribed := false
+	var subscription map[string]bool
 	for {
 		select {
 		case err := <-errors:
@@ -92,21 +92,28 @@ func (h Handler) runSession(connection *websocket.Conn) error {
 					return err
 				}
 			case next.Type == "subscribe":
-				subscribed = true
+				selected, valid := selectMetrics(next.Metrics)
+				if !valid {
+					if err := connection.WriteJSON(map[string]string{"type": "error", "code": "INVALID_SUBSCRIPTION"}); err != nil {
+						return err
+					}
+					continue
+				}
+				subscription = selected
 			case next.Type != "":
 				if err := connection.WriteJSON(map[string]string{"type": "error", "code": "INVALID_MESSAGE"}); err != nil {
 					return err
 				}
 			}
 		case <-metricsTicker.C:
-			if !subscribed {
+			if subscription == nil {
 				continue
 			}
 			snapshot, ready := h.store.Snapshot()
 			if !ready {
 				continue
 			}
-			payload, err := json.Marshal(metricMessage{Type: "metrics", Protocol: "streamdeck-monitor", Version: 1, Timestamp: snapshot.Timestamp, Data: snapshot})
+			payload, err := json.Marshal(metricMessage{Type: "metrics", Protocol: "streamdeck-monitor", Version: 1, Timestamp: snapshot.Timestamp, Data: filterSnapshot(snapshot, subscription)})
 			if err != nil {
 				return err
 			}
@@ -119,6 +126,44 @@ func (h Handler) runSession(connection *websocket.Conn) error {
 			}
 		}
 	}
+}
+
+func selectMetrics(requested []string) (map[string]bool, bool) {
+	selected := make(map[string]bool, len(requested))
+	for _, name := range requested {
+		if !supportedMetrics[name] {
+			return nil, false
+		}
+		selected[name] = true
+	}
+	return selected, true
+}
+
+var supportedMetrics = map[string]bool{
+	"cpu": true, "memory": true, "temperature": true, "disk": true,
+	"network": true, "services": true, "docker": true, "custom": true,
+}
+
+func filterSnapshot(snapshot metrics.Snapshot, selected map[string]bool) metrics.Snapshot {
+	if !selected["temperature"] {
+		snapshot.Temperature = nil
+	}
+	if !selected["disk"] {
+		snapshot.Disks = nil
+	}
+	if !selected["network"] {
+		snapshot.Network = nil
+	}
+	if !selected["services"] {
+		snapshot.Services = nil
+	}
+	if !selected["docker"] {
+		snapshot.Docker = nil
+	}
+	if !selected["custom"] {
+		snapshot.Custom = nil
+	}
+	return snapshot
 }
 
 type helloAck struct {

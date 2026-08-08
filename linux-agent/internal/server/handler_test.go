@@ -60,4 +60,13 @@ func TestHandlerPushesMetricsAfterSubscribe(t *testing.T) {
 	if update.Type != "metrics" || update.Data.Timestamp.IsZero() {
 		t.Fatalf("unexpected update: %+v", update)
 	}
+	if len(update.Data.Temperature) != 0 || len(update.Data.Disks) != 0 || len(update.Data.Network) != 0 {
+		t.Fatalf("optional metrics were not filtered: %+v", update.Data)
+	}
+}
+
+func TestSelectMetricsRejectsUnknownMetric(t *testing.T) {
+	if _, valid := selectMetrics([]string{"cpu", "unknown"}); valid {
+		t.Fatal("unknown metric was accepted")
+	}
 }
