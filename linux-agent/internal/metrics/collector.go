@@ -14,6 +14,7 @@ import (
 	"github.com/hasilan/node-deck/linux-agent/internal/config"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
+	"github.com/shirou/gopsutil/v4/load"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/net"
 	"github.com/shirou/gopsutil/v4/sensors"
@@ -34,6 +35,9 @@ type Snapshot struct {
 type CPU struct {
 	UsagePercent float64   `json:"usagePercent"`
 	Cores        []float64 `json:"cores"`
+	Load1        float64   `json:"load1"`
+	Load5        float64   `json:"load5"`
+	Load15       float64   `json:"load15"`
 }
 
 type Memory struct {
@@ -122,6 +126,7 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
+	loadAverage, _ := load.AvgWithContext(ctx)
 	c.mu.Lock()
 	disks, networks := c.collectDevices()
 	c.mu.Unlock()
@@ -131,7 +136,7 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 	}
 	return Snapshot{
 		Timestamp:   time.Now().UTC(),
-		CPU:         CPU{UsagePercent: finite(first(usage)), Cores: cores},
+		CPU:         CPU{UsagePercent: finite(first(usage)), Cores: cores, Load1: finite(loadAverage.Load1), Load5: finite(loadAverage.Load5), Load15: finite(loadAverage.Load15)},
 		Memory:      Memory{UsedBytes: memory.Used, AvailableBytes: memory.Available, UsedPercent: finite(memory.UsedPercent)},
 		Temperature: temperatures, Disks: disks, Network: networks,
 		Services: c.collectServicesCached(ctx, now), Docker: c.collectDockerCached(ctx, now), Custom: c.collectCustom(ctx, now),

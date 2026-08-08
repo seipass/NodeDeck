@@ -2,21 +2,33 @@
 
 NodeDeck displays Linux host metrics on an Elgato Stream Deck.
 
-## Phase 1
+## Features
 
-The current implementation provides:
+- Go Linux Agent distributed as a single binary.
+- Token-authenticated JSON WebSocket endpoint at `/ws`.
+- One shared Windows WebSocket connection per Linux host.
+- CPU, per-core CPU, 1/5/15-minute load average, memory, temperature, disk, network,
+  systemd service, Docker, and allowlisted Custom Metrics.
+- Cached slow collectors: temperature and Docker at 2 seconds, systemd at 5
+  seconds, and Custom Metrics at their configured intervals.
+- Dynamic SVG rendering with value, unit, gauge, warning/critical thresholds,
+  and explicit connecting/offline/authentication-error states.
+- Exponential reconnect backoff, heartbeat, sleep/wake reconnect, optional TLS,
+  and bounded WebSocket/custom-command input.
 
-- Go Linux Agent with CPU and memory collection.
-- Token-authenticated WebSocket endpoint at `/ws`.
-- One-second metric push after subscription.
-- TypeScript Stream Deck plugin using one shared connection per host.
-- Dynamic SVG CPU rendering and reconnect backoff.
+## Configuration
+
+Copy `linux-agent/config.example.yaml` to
+`/etc/streamdeck-monitor/config.yaml` and set a long random `token`. Custom
+commands are argv arrays and must use an absolute executable path; the agent
+never executes them through a shell. Docker and systemd collection are
+optional, so their absence does not stop the agent.
 
 ### Run the agent
 
 ```sh
 cd linux-agent
-go run ./cmd/agent -port 8765 -token replace-with-a-long-token
+go run ./cmd/agent -config /etc/streamdeck-monitor/config.yaml
 ```
 
 The Windows plugin connects to `ws://HOST:8765/ws`.
@@ -26,10 +38,15 @@ The Windows plugin connects to `ws://HOST:8765/ws`.
 ```sh
 cd windows-plugin
 npm install
-npm run build
+npm test
+npm run typecheck
+npm run pack
 ```
 
-The generated `com.nodedeck.monitor.sdPlugin/plugin.js` is the file referenced by the SDK manifest and can be copied into the Stream Deck plugins directory.
+The generated `com.nodedeck.monitor.sdPlugin/plugin.js` is the file referenced
+by the SDK manifest. The Property Inspector configures host, port, token,
+metric type, device/service/container/custom ID, formatting, refresh interval,
+and thresholds.
 
 To validate and create the installable plugin package, install the official Stream Deck CLI and run:
 
@@ -39,5 +56,15 @@ npm run pack
 ```
 
 The resulting `.streamDeckPlugin` file is written to `windows-plugin/dist/`.
+
+### Linux agent verification
+
+```sh
+cd linux-agent
+go test -race -shuffle=on -count=1 ./...
+go build ./...
+```
+
+The systemd unit is `linux-agent/deploy/streamdeck-monitor.service`.
 
 The plugin source uses `@elgato/streamdeck` SDK 2 and targets the Node.js 24 runtime supported by Stream Deck 7.1+.
