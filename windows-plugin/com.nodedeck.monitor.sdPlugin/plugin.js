@@ -14121,11 +14121,38 @@ class ConnectionManager {
     }
 }
 
-function renderCpu(usage, state) {
+function renderMetric(label, value, unit, state) {
     if (state !== "online")
         return `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144"><rect width="144" height="144" fill="#20242b"/><text x="72" y="72" fill="#ffb020" text-anchor="middle" font-size="16">${state}</text></svg>`;
-    const bounded = Math.max(0, Math.min(100, usage));
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144"><rect width="144" height="144" fill="#20242b"/><text x="12" y="24" fill="#fff" font-size="16">CPU</text><text x="72" y="82" fill="#fff" text-anchor="middle" font-size="34">${bounded.toFixed(1)}%</text><rect x="12" y="112" width="120" height="8" rx="4" fill="#48515c"/><rect x="12" y="112" width="${1.2 * bounded}" height="8" rx="4" fill="#4ade80"/></svg>`;
+    const bounded = Math.max(0, Math.min(100, value));
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144"><rect width="144" height="144" fill="#20242b"/><text x="12" y="24" fill="#fff" font-size="16">${label}</text><text x="72" y="82" fill="#fff" text-anchor="middle" font-size="34">${bounded.toFixed(1)}${unit}</text><rect x="12" y="112" width="120" height="8" rx="4" fill="#48515c"/><rect x="12" y="112" width="${1.2 * bounded}" height="8" rx="4" fill="#4ade80"/></svg>`;
+}
+
+function selectMetric(snapshot, settings) {
+    switch (settings.metricType ?? "cpu") {
+        case "cpu": return { label: "CPU", value: snapshot.data.cpu.usagePercent, unit: "%" };
+        case "memory": return { label: "MEM", value: snapshot.data.memory.usedPercent, unit: "%" };
+        case "temperature": {
+            const item = snapshot.data.temperature?.find((entry) => entry.sensor === settings.device) ?? snapshot.data.temperature?.[0];
+            return item === undefined ? undefined : { label: item.sensor, value: item.celsius, unit: "°C" };
+        }
+        case "disk": {
+            const item = snapshot.data.disks?.find((entry) => entry.mountpoint === settings.device) ?? snapshot.data.disks?.[0];
+            return item === undefined ? undefined : { label: item.mountpoint, value: item.usedPercent, unit: "%" };
+        }
+        case "network": {
+            const item = snapshot.data.network?.find((entry) => entry.interface === settings.device) ?? snapshot.data.network?.[0];
+            return item === undefined ? undefined : rateMetric(item.interface, item.rxBytesPerSecond);
+        }
+        default: return undefined;
+    }
+}
+function rateMetric(label, bytes) {
+    if (bytes >= 1_000_000_000)
+        return { label, value: bytes / 1_000_000_000, unit: "GB/s" };
+    if (bytes >= 1_000_000)
+        return { label, value: bytes / 1_000_000, unit: "MB/s" };
+    return { label, value: bytes / 1_000, unit: "KB/s" };
 }
 
 class MetricDisplayAction extends SingletonAction {
@@ -14142,7 +14169,8 @@ class MetricDisplayAction extends SingletonAction {
         const token = settings.token ?? "";
         const connection = this.connections.get(host, port, token);
         connection.on((state, snapshot) => {
-            void action.setImage(renderCpu(snapshot?.data.cpu.usagePercent ?? 0, state));
+            const metric = snapshot === undefined ? undefined : selectMetric(snapshot, settings);
+            void action.setImage(metric === undefined ? renderMetric("Metric", 0, "", state === "online" ? "metric-unavailable" : state) : renderMetric(metric.label, metric.value, metric.unit, state));
         });
     }
 }

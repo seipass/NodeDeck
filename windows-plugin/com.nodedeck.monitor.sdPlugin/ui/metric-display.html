@@ -5,5 +5,7 @@
   <sdpi-item label="Linux Host"><sdpi-textfield setting="host" placeholder="192.168.1.10"></sdpi-textfield></sdpi-item>
   <sdpi-item label="Port"><sdpi-number setting="port" min="1" max="65535" default="8765"></sdpi-number></sdpi-item>
   <sdpi-item label="Token"><sdpi-textfield setting="token" type="password"></sdpi-textfield></sdpi-item>
+  <sdpi-item label="Metric"><sdpi-select setting="metricType"><option value="cpu">CPU</option><option value="memory">Memory</option><option value="temperature">Temperature</option><option value="disk">Disk</option><option value="network">Network</option></sdpi-select></sdpi-item>
+  <sdpi-item label="Device"><sdpi-textfield setting="device" placeholder="eth0, /, or sensor"></sdpi-textfield></sdpi-item>
 </body>
 </html>

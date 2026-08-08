@@ -6,6 +6,9 @@ export type MetricSnapshot = Readonly<{
   data: Readonly<{
     cpu: Readonly<{ usagePercent: number; cores: readonly number[] }>;
     memory: Readonly<{ usedBytes: number; availableBytes: number; usedPercent: number }>;
+    temperature?: readonly Readonly<{ sensor: string; celsius: number }>[];
+    disks?: readonly Readonly<{ mountpoint: string; usedBytes: number; freeBytes: number; usedPercent: number; readBytesPerSecond: number; writeBytesPerSecond: number }>[];
+    network?: readonly Readonly<{ interface: string; rxBytesPerSecond: number; txBytesPerSecond: number; rxBytes: number; txBytes: number }>[];
   }>;
 }>;
 

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hasilan/node-deck/linux-agent/internal/metrics"
 	"github.com/gorilla/websocket"
+	"github.com/hasilan/node-deck/linux-agent/internal/metrics"
 )
 
 type Handler struct {
@@ -44,7 +44,7 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		_ = connection.WriteJSON(map[string]string{"type": "error", "code": "AUTH_FAILED"})
 		return
 	}
-	if err := connection.WriteJSON(helloAck{Type: "hello_ack", Protocol: "streamdeck-monitor", Version: 1, Capabilities: []string{"cpu", "memory"}}); err != nil {
+	if err := connection.WriteJSON(helloAck{Type: "hello_ack", Protocol: "streamdeck-monitor", Version: 1, Capabilities: []string{"cpu", "memory", "temperature", "disk", "network"}}); err != nil {
 		return
 	}
 	for {
@@ -62,6 +62,9 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		if incoming.Type != "subscribe" {
 			_ = connection.WriteJSON(map[string]string{"type": "error", "code": "INVALID_MESSAGE"})
 			continue
+		}
+		if err := connection.SetReadDeadline(time.Time{}); err != nil {
+			return
 		}
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()

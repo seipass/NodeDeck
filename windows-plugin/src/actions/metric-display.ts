@@ -1,8 +1,9 @@
 import { SingletonAction, type WillAppearEvent, type DidReceiveSettingsEvent } from "@elgato/streamdeck";
 import type { ConnectionManager } from "../connection/connection-manager.js";
-import { renderCpu } from "../rendering/metric-renderer.js";
+import { renderMetric } from "../rendering/metric-renderer.js";
+import { selectMetric, type MetricSettings } from "../metrics/selectors.js";
 
-type Settings = Readonly<{ host?: string; port?: number; token?: string }>;
+type Settings = Readonly<{ host?: string; port?: number; token?: string; metricType?: MetricSettings["metricType"]; device?: string }>;
 
 export class MetricDisplayAction extends SingletonAction<Settings> {
   public constructor(private readonly connections: ConnectionManager) { super(); }
@@ -15,7 +16,8 @@ export class MetricDisplayAction extends SingletonAction<Settings> {
     const token = settings.token ?? "";
     const connection = this.connections.get(host, port, token);
     connection.on((state, snapshot) => {
-      void action.setImage(renderCpu(snapshot?.data.cpu.usagePercent ?? 0, state));
+      const metric = snapshot === undefined ? undefined : selectMetric(snapshot, settings);
+      void action.setImage(metric === undefined ? renderMetric("Metric", 0, "", state === "online" ? "metric-unavailable" : state) : renderMetric(metric.label, metric.value, metric.unit, state));
     });
   }
 }
