@@ -216,11 +216,15 @@ type cappedBuffer struct {
 	bytes.Buffer
 	limit    int
 	exceeded bool
+	cancel   context.CancelFunc
 }
 
 func (b *cappedBuffer) Write(data []byte) (int, error) {
 	if b.Len()+len(data) > b.limit {
 		b.exceeded = true
+		if b.cancel != nil {
+			b.cancel()
+		}
 		remaining := b.limit - b.Len()
 		if remaining > 0 {
 			_, _ = b.Buffer.Write(data[:remaining])
@@ -253,8 +257,8 @@ func runCustom(parent context.Context, id string, definition config.CustomMetric
 	ctx, cancel := context.WithTimeout(parent, definition.Timeout)
 	defer cancel()
 	command := exec.CommandContext(ctx, definition.Command[0], definition.Command[1:]...)
-	stdout := &cappedBuffer{limit: definition.MaxOutputBytes}
-	stderr := &cappedBuffer{limit: definition.MaxOutputBytes}
+	stdout := &cappedBuffer{limit: definition.MaxOutputBytes, cancel: cancel}
+	stderr := &cappedBuffer{limit: definition.MaxOutputBytes, cancel: cancel}
 	command.Stdout, command.Stderr = stdout, stderr
 	err := command.Run()
 	result.Stdout, result.Stderr = stdout.String(), stderr.String()
