@@ -14208,8 +14208,21 @@ class MetricDisplayAction extends SingletonAction {
         const token = settings.token ?? "";
         const connection = this.connections.get(host, port, token);
         this.subscriptions.get(action.id)?.();
+        let lastState;
+        let lastValue;
+        let lastRenderedAt = 0;
         this.subscriptions.set(action.id, connection.on((state, snapshot) => {
             const metric = snapshot === undefined ? undefined : selectMetric(snapshot, settings);
+            const value = metric?.value;
+            const now = Date.now();
+            if (state === lastState && value === lastValue)
+                return;
+            const refreshInterval = Math.max(0, settings.refreshInterval ?? 1) * 1000;
+            if (state === "online" && now - lastRenderedAt < refreshInterval)
+                return;
+            lastState = state;
+            lastValue = value;
+            lastRenderedAt = now;
             void action.setImage(metric === undefined ? renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, state === "online" ? "metric-unavailable" : state) : renderMetric({ label: settings.label ?? metric.label, value: metric.value, unit: settings.unit ?? metric.unit, decimalPlaces: settings.decimalPlaces ?? 1, warningThreshold: settings.warningThreshold, criticalThreshold: settings.criticalThreshold }, state));
         }));
     }
