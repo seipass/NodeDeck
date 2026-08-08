@@ -14316,7 +14316,8 @@ function selectMetric(snapshot, settings) {
             if (item === undefined || item.status !== "ok" || item.value === undefined)
                 return undefined;
             const value = Number(item.value);
-            return { label: item.id, value: Number.isFinite(value) ? value : 0, displayValue: item.value, unit: "" };
+            const displayValue = item.value.replace(/\s+/g, " ").trim();
+            return { label: item.id, value: Number.isFinite(value) ? value : 0, displayValue: displayValue.length > 48 ? `${displayValue.slice(0, 47)}…` : displayValue, unit: "" };
         }
         default: return undefined;
     }

@@ -23,7 +23,7 @@ export function selectMetric(snapshot: MetricSnapshot, settings: MetricSettings)
     case "docker-cpu": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item?.cpuPercent === undefined ? undefined : { label: item.name, value: item.cpuPercent, unit: "%" }; }
     case "docker-memory": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item?.memoryUsageBytes === undefined ? undefined : bytesMetric(item.name, item.memoryUsageBytes); }
     case "docker-uptime": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item?.uptimeSeconds === undefined ? undefined : { label: item.name, value: item.uptimeSeconds, unit: "s" }; }
-    case "custom": { const item = snapshot.data.custom?.find((entry) => entry.id === settings.customMetricId); if (item === undefined || item.status !== "ok" || item.value === undefined) return undefined; const value = Number(item.value); return { label: item.id, value: Number.isFinite(value) ? value : 0, displayValue: item.value, unit: "" }; }
+    case "custom": { const item = snapshot.data.custom?.find((entry) => entry.id === settings.customMetricId); if (item === undefined || item.status !== "ok" || item.value === undefined) return undefined; const value = Number(item.value); const displayValue = item.value.replace(/\s+/g, " ").trim(); return { label: item.id, value: Number.isFinite(value) ? value : 0, displayValue: displayValue.length > 48 ? `${displayValue.slice(0, 47)}…` : displayValue, unit: "" }; }
     default: return undefined;
   }
 }

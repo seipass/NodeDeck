@@ -23,4 +23,11 @@ describe("selectMetric", () => {
     const customSnapshot: MetricSnapshot = { ...snapshot, data: { ...snapshot.data, custom: [{ id: "status", status: "ok", value: "online", exitCode: 0 }] } };
     expect(selectMetric(customSnapshot, { metricType: "custom", customMetricId: "status" })).toEqual({ label: "status", value: 0, displayValue: "online", unit: "" });
   });
+  it("bounds custom display text without changing numeric selection", () => {
+    const customSnapshot: MetricSnapshot = { ...snapshot, data: { ...snapshot.data, custom: [{ id: "status", status: "ok", value: "  one\n two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen  ", exitCode: 0 }] } };
+    const selected = selectMetric(customSnapshot, { metricType: "custom", customMetricId: "status" });
+    expect(selected?.value).toBe(0);
+    expect(selected?.displayValue).toHaveLength(48);
+    expect(selected?.displayValue).not.toContain("\n");
+  });
 });
