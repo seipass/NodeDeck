@@ -67,4 +67,15 @@ go build ./...
 
 The systemd unit is `linux-agent/deploy/streamdeck-monitor.service`.
 
+For a Linux host with Go and systemd installed, run the installer as root:
+
+```sh
+cd linux-agent
+sudo deploy/install.sh
+```
+
+The installer never overwrites an existing
+`/etc/streamdeck-monitor/config.yaml`; edit that file and restart the service
+after changing settings.
+
 The plugin source uses `@elgato/streamdeck` SDK 2 and targets the Node.js 24 runtime supported by Stream Deck 7.1+.
