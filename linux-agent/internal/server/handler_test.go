@@ -103,3 +103,27 @@ func TestHandlerRejectsWrongProtocol(t *testing.T) {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 }
+
+func TestHandlerRejectsWrongToken(t *testing.T) {
+	server := httptest.NewServer(NewHandler(metrics.NewStore(), "secret"))
+	defer server.Close()
+	url := "ws" + server.URL[len("http"):] + "/ws"
+	connection, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	if err := connection.WriteJSON(message{Type: "hello", Protocol: "streamdeck-monitor", Version: 1, Token: "wrong-token"}); err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Type string `json:"type"`
+		Code string `json:"code"`
+	}
+	if err := connection.ReadJSON(&response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Type != "error" || response.Code != "AUTH_FAILED" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
