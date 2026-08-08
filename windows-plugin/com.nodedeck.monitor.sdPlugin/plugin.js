@@ -14063,17 +14063,23 @@ class AgentConnection {
         this.url = url;
         this.token = token;
     }
+    getToken() { return this.token; }
     start() { if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING)
         return; this.connect(); }
-    reconnect() { this.socket?.close(); this.socket = undefined; this.authenticated = false; this.start(); }
-    stop() {
-        if (this.timer !== undefined)
-            clearTimeout(this.timer);
+    reconnect() {
+        this.clearReconnectTimer();
+        this.clearStaleTimer();
         this.socket?.close();
         this.socket = undefined;
         this.authenticated = false;
-        if (this.staleTimer !== undefined)
-            clearInterval(this.staleTimer);
+        this.start();
+    }
+    stop() {
+        this.clearReconnectTimer();
+        this.socket?.close();
+        this.socket = undefined;
+        this.authenticated = false;
+        this.clearStaleTimer();
     }
     on(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
     connect() {
@@ -14086,7 +14092,6 @@ class AgentConnection {
             if (generation !== this.generation)
                 return;
             socket.send(JSON.stringify({ type: "hello", protocol: "streamdeck-monitor", version: 1, token: this.token }));
-            socket.send(JSON.stringify({ type: "subscribe", metrics: ["cpu", "memory"] }));
             this.staleTimer = setInterval(() => { if (this.state === "online") {
                 this.state = "metric-unavailable";
                 this.notify();
@@ -14109,6 +14114,7 @@ class AgentConnection {
                 this.retryMs = 1_000;
                 this.state = "online";
                 this.notify();
+                socket.send(JSON.stringify({ type: "subscribe", metrics: ["cpu", "memory"] }));
             }
             if (message?.type === "metrics" && this.authenticated) {
                 this.state = "online";
@@ -14136,6 +14142,18 @@ class AgentConnection {
     }
     notify(snapshot) { for (const listener of this.listeners)
         listener(this.state, snapshot); }
+    clearStaleTimer() {
+        if (this.staleTimer !== undefined) {
+            clearInterval(this.staleTimer);
+            this.staleTimer = undefined;
+        }
+    }
+    clearReconnectTimer() {
+        if (this.timer !== undefined) {
+            clearTimeout(this.timer);
+            this.timer = undefined;
+        }
+    }
 }
 
 class ConnectionManager {
@@ -14143,8 +14161,12 @@ class ConnectionManager {
     get(host, port, token) {
         const key = `${host}:${port}`;
         const existing = this.connections.get(key);
-        if (existing !== undefined)
-            return existing;
+        if (existing !== undefined) {
+            if (existing.getToken() === token)
+                return existing;
+            existing.stop();
+            this.connections.delete(key);
+        }
         const connection = new AgentConnection(`ws://${host}:${port}/ws`, token);
         this.connections.set(key, connection);
         connection.start();
