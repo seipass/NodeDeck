@@ -32,7 +32,7 @@ export function parseAgentMessage(value: unknown): AgentMessage | undefined {
 }
 
 function isMetricSnapshot(value: unknown): value is MetricSnapshot {
-  if (!isRecord(value) || value.type !== "metrics" || value.protocol !== "streamdeck-monitor" || value.version !== 1 || typeof value.timestamp !== "string" || !isRecord(value.data)) return false;
+  if (!isRecord(value) || value.type !== "metrics" || value.protocol !== "streamdeck-monitor" || value.version !== 1 || typeof value.timestamp !== "string" || Number.isNaN(Date.parse(value.timestamp)) || !isRecord(value.data)) return false;
   const cpu = value.data.cpu;
   const memory = value.data.memory;
   return isRecord(cpu) && isFiniteNumber(cpu.usagePercent) && isFiniteNumber(cpu.load1) && isFiniteNumber(cpu.load5) && isFiniteNumber(cpu.load15) && isFiniteNumberArray(cpu.cores) && isRecord(memory) && isFiniteNumber(memory.usedBytes) && isFiniteNumber(memory.availableBytes) && isFiniteNumber(memory.usedPercent) && isFiniteNumber(memory.swapUsedBytes) && isFiniteNumber(memory.swapUsedPercent) && isOptionalArray(value.data.temperature, isTemperature) && isOptionalArray(value.data.disks, isDisk) && isOptionalArray(value.data.network, isNetwork) && isOptionalArray(value.data.services, isService) && isOptionalArray(value.data.docker, isDocker) && isOptionalArray(value.data.custom, isCustom);

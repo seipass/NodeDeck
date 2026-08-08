@@ -14045,7 +14045,7 @@ function parseAgentMessage(value) {
     return undefined;
 }
 function isMetricSnapshot(value) {
-    if (!isRecord(value) || value.type !== "metrics" || value.protocol !== "streamdeck-monitor" || value.version !== 1 || typeof value.timestamp !== "string" || !isRecord(value.data))
+    if (!isRecord(value) || value.type !== "metrics" || value.protocol !== "streamdeck-monitor" || value.version !== 1 || typeof value.timestamp !== "string" || Number.isNaN(Date.parse(value.timestamp)) || !isRecord(value.data))
         return false;
     const cpu = value.data.cpu;
     const memory = value.data.memory;
