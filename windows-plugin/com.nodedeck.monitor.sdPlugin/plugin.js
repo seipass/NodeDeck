@@ -14040,12 +14040,33 @@ function requireWebsocketServer () {
 requireWebsocketServer();
 
 function parseAgentMessage(value) {
-    if (typeof value !== "object" || value === null || !("type" in value))
-        return undefined;
-    const candidate = value;
-    if (candidate.type === "hello_ack" || candidate.type === "metrics" || candidate.type === "error")
+    if (isMetricSnapshot(value) || isHelloAck(value) || isAgentError(value))
         return value;
     return undefined;
+}
+function isMetricSnapshot(value) {
+    if (!isRecord(value) || value.type !== "metrics" || value.protocol !== "streamdeck-monitor" || value.version !== 1 || typeof value.timestamp !== "string" || !isRecord(value.data))
+        return false;
+    const cpu = value.data.cpu;
+    const memory = value.data.memory;
+    return isRecord(cpu) && isFiniteNumber(cpu.usagePercent) && isFiniteNumber(cpu.load1) && isFiniteNumber(cpu.load5) && isFiniteNumber(cpu.load15) && isFiniteNumberArray(cpu.cores) && isRecord(memory) && isFiniteNumber(memory.usedBytes) && isFiniteNumber(memory.availableBytes) && isFiniteNumber(memory.usedPercent) && isFiniteNumber(memory.swapUsedBytes) && isFiniteNumber(memory.swapUsedPercent);
+}
+function isHelloAck(value) {
+    if (!isRecord(value) || value.type !== "hello_ack" || value.protocol !== "streamdeck-monitor" || value.version !== 1 || !Array.isArray(value.capabilities))
+        return false;
+    return value.capabilities.every((capability) => typeof capability === "string");
+}
+function isAgentError(value) {
+    return isRecord(value) && value.type === "error" && typeof value.code === "string" && (value.message === undefined || typeof value.message === "string") && (value.retryable === undefined || typeof value.retryable === "boolean");
+}
+function isRecord(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isFiniteNumber(value) {
+    return typeof value === "number" && Number.isFinite(value);
+}
+function isFiniteNumberArray(value) {
+    return Array.isArray(value) && value.every(isFiniteNumber);
 }
 
 class MetricStore {
