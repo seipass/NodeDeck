@@ -14102,8 +14102,10 @@ class AgentConnection {
                 this.state = "online";
                 this.notify();
             }
-            if (message?.type === "metrics" && this.authenticated)
+            if (message?.type === "metrics" && this.authenticated) {
+                this.state = "online";
                 this.notify(message);
+            }
             if (message?.type === "error") {
                 this.state = message.code === "AUTH_FAILED" ? "authentication-error" : "agent-error";
                 this.notify();

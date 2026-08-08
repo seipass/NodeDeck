@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "build": "rollup -c",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate": "streamdeck validate com.nodedeck.monitor.sdPlugin --no-update-check",
+    "pack": "npm run build && npm run validate && streamdeck pack com.nodedeck.monitor.sdPlugin --output dist --no-update-check --force"
   },
   "dependencies": {
     "@elgato/streamdeck": "2.1.0",
