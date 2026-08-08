@@ -14234,6 +14234,10 @@ class MetricDisplayAction extends SingletonAction {
         this.connections = connections;
     }
     onWillAppear(ev) { this.connect(ev.action, ev.payload.settings); }
+    onWillDisappear(ev) {
+        this.subscriptions.get(ev.action.id)?.();
+        this.subscriptions.delete(ev.action.id);
+    }
     onDidReceiveSettings(ev) { this.connect(ev.action, ev.payload.settings); }
     connect(action, settings) {
         const host = settings.host ?? "127.0.0.1";
