@@ -69,8 +69,14 @@ func TestHandlerPushesMetricsAfterSubscribe(t *testing.T) {
 }
 
 func TestSelectMetricsRejectsUnknownMetric(t *testing.T) {
-	if _, valid := selectMetrics([]string{"cpu", "unknown"}); valid {
+	if _, valid := selectMetrics([]string{"cpu", "unknown"}, []string{"cpu", "memory"}); valid {
 		t.Fatal("unknown metric was accepted")
+	}
+}
+
+func TestSelectMetricsRejectsUnavailableMetric(t *testing.T) {
+	if _, valid := selectMetrics([]string{"docker"}, []string{"cpu", "memory"}); valid {
+		t.Fatal("unavailable metric was accepted")
 	}
 }
 

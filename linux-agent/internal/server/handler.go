@@ -96,7 +96,7 @@ func (h Handler) runSession(connection *websocket.Conn) error {
 					return err
 				}
 			case next.Type == "subscribe":
-				selected, valid := selectMetrics(next.Metrics)
+				selected, valid := selectMetrics(next.Metrics, h.capabilities)
 				if !valid {
 					if err := connection.WriteJSON(map[string]string{"type": "error", "code": "INVALID_SUBSCRIPTION"}); err != nil {
 						return err
@@ -132,10 +132,14 @@ func (h Handler) runSession(connection *websocket.Conn) error {
 	}
 }
 
-func selectMetrics(requested []string) (map[string]bool, bool) {
+func selectMetrics(requested []string, capabilities []string) (map[string]bool, bool) {
+	available := make(map[string]bool, len(capabilities))
+	for _, capability := range capabilities {
+		available[capability] = true
+	}
 	selected := make(map[string]bool, len(requested))
 	for _, name := range requested {
-		if !supportedMetrics[name] {
+		if !supportedMetrics[name] || !available[name] {
 			return nil, false
 		}
 		selected[name] = true
