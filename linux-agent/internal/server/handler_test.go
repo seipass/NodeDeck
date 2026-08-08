@@ -23,7 +23,7 @@ func TestHandlerPushesMetricsAfterSubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer connection.Close()
-	if err := connection.WriteJSON(message{Type: "hello", Version: 1, Token: "secret"}); err != nil {
+	if err := connection.WriteJSON(message{Type: "hello", Protocol: "streamdeck-monitor", Version: 1, Token: "secret"}); err != nil {
 		t.Fatal(err)
 	}
 	var ack helloAck
@@ -68,5 +68,29 @@ func TestHandlerPushesMetricsAfterSubscribe(t *testing.T) {
 func TestSelectMetricsRejectsUnknownMetric(t *testing.T) {
 	if _, valid := selectMetrics([]string{"cpu", "unknown"}); valid {
 		t.Fatal("unknown metric was accepted")
+	}
+}
+
+func TestHandlerRejectsWrongProtocol(t *testing.T) {
+	server := httptest.NewServer(NewHandler(metrics.NewStore(), "secret"))
+	defer server.Close()
+	url := "ws" + server.URL[len("http"):] + "/ws"
+	connection, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	if err := connection.WriteJSON(message{Type: "hello", Protocol: "other-protocol", Version: 1, Token: "secret"}); err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Type string `json:"type"`
+		Code string `json:"code"`
+	}
+	if err := connection.ReadJSON(&response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Type != "error" || response.Code != "AUTH_FAILED" {
+		t.Fatalf("unexpected response: %+v", response)
 	}
 }

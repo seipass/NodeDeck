@@ -41,7 +41,7 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 	defer connection.Close()
 	connection.SetReadLimit(1 << 20)
 	var hello message
-	if err := connection.ReadJSON(&hello); err != nil || hello.Type != "hello" || hello.Token != h.token || hello.Version != 1 {
+	if err := connection.ReadJSON(&hello); err != nil || hello.Type != "hello" || hello.Protocol != "streamdeck-monitor" || hello.Token != h.token || hello.Version != 1 {
 		_ = connection.WriteJSON(map[string]string{"type": "error", "code": "AUTH_FAILED"})
 		return
 	}
