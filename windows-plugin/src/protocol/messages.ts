@@ -9,6 +9,8 @@ export type MetricSnapshot = Readonly<{
     temperature?: readonly Readonly<{ sensor: string; celsius: number }>[];
     disks?: readonly Readonly<{ mountpoint: string; usedBytes: number; freeBytes: number; usedPercent: number; readBytesPerSecond: number; writeBytesPerSecond: number }>[];
     network?: readonly Readonly<{ interface: string; rxBytesPerSecond: number; txBytesPerSecond: number; rxBytes: number; txBytes: number }>[];
+    services?: readonly Readonly<{ name: string; loadState: string; activeState: string; subState: string }>[];
+    docker?: readonly Readonly<{ id: string; name: string; state: string }>[];
   }>;
 }>;
 

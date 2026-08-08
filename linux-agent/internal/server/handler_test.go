@@ -1,0 +1,49 @@
+package server
+
+import (
+	"context"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/hasilan/node-deck/linux-agent/internal/metrics"
+)
+
+func TestHandlerPushesMetricsAfterSubscribe(t *testing.T) {
+	store := metrics.NewStore()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go store.Run(ctx, metrics.NewCollector(nil, false), 50*time.Millisecond)
+	server := httptest.NewServer(NewHandler(store, "secret"))
+	defer server.Close()
+	url := "ws" + server.URL[len("http"):] + "/ws"
+	connection, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	if err := connection.WriteJSON(message{Type: "hello", Version: 1, Token: "secret"}); err != nil {
+		t.Fatal(err)
+	}
+	var ack helloAck
+	if err := connection.ReadJSON(&ack); err != nil {
+		t.Fatal(err)
+	}
+	if ack.Type != "hello_ack" {
+		t.Fatalf("ack type = %q", ack.Type)
+	}
+	if err := connection.WriteJSON(message{Type: "subscribe", Metrics: []string{"cpu"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := connection.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	var update metricMessage
+	if err := connection.ReadJSON(&update); err != nil {
+		t.Fatal(err)
+	}
+	if update.Type != "metrics" || update.Data.Timestamp.IsZero() {
+		t.Fatalf("unexpected update: %+v", update)
+	}
+}

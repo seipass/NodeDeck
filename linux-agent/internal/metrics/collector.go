@@ -2,6 +2,10 @@ package metrics
 
 import (
 	"context"
+	"encoding/json"
+	"math"
+	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +23,8 @@ type Snapshot struct {
 	Temperature []Temperature `json:"temperature,omitempty"`
 	Disks       []Disk        `json:"disks,omitempty"`
 	Network     []Network     `json:"network,omitempty"`
+	Services    []Service     `json:"services,omitempty"`
+	Docker      []Container   `json:"docker,omitempty"`
 }
 
 type CPU struct {
@@ -51,16 +57,31 @@ type Network struct {
 	RxBytes          uint64  `json:"rxBytes"`
 	TxBytes          uint64  `json:"txBytes"`
 }
+type Service struct {
+	Name        string `json:"name"`
+	LoadState   string `json:"loadState"`
+	ActiveState string `json:"activeState"`
+	SubState    string `json:"subState"`
+}
+type Container struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	State       string `json:"state"`
+	CPUPercent  string `json:"cpuPercent,omitempty"`
+	MemoryUsage string `json:"memoryUsage,omitempty"`
+}
 
 type Collector struct {
 	mu       sync.Mutex
 	previous time.Time
 	disks    map[string]disk.IOCountersStat
 	network  map[string]net.IOCountersStat
+	services []string
+	docker   bool
 }
 
-func NewCollector() Collector {
-	return Collector{disks: make(map[string]disk.IOCountersStat), network: make(map[string]net.IOCountersStat)}
+func NewCollector(services []string, dockerEnabled bool) Collector {
+	return Collector{disks: make(map[string]disk.IOCountersStat), network: make(map[string]net.IOCountersStat), services: services, docker: dockerEnabled}
 }
 
 func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
@@ -80,13 +101,96 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 	disks, networks := c.collectDevices()
 	temperatures := collectTemperatures()
 	c.mu.Unlock()
+	for index, core := range cores {
+		cores[index] = finite(core)
+	}
 	return Snapshot{
 		Timestamp:   time.Now().UTC(),
-		CPU:         CPU{UsagePercent: first(usage), Cores: cores},
-		Memory:      Memory{UsedBytes: memory.Used, AvailableBytes: memory.Available, UsedPercent: memory.UsedPercent},
+		CPU:         CPU{UsagePercent: finite(first(usage)), Cores: cores},
+		Memory:      Memory{UsedBytes: memory.Used, AvailableBytes: memory.Available, UsedPercent: finite(memory.UsedPercent)},
 		Temperature: temperatures, Disks: disks, Network: networks,
+		Services: collectServices(c.services), Docker: collectDocker(c.docker),
 	}, nil
 }
+
+func collectServices(names []string) []Service {
+	services := make([]Service, 0, len(names))
+	for _, name := range names {
+		if !validUnit(name) {
+			continue
+		}
+		output, err := exec.Command("systemctl", "show", "--no-page", "--property=LoadState,ActiveState,SubState", name).Output()
+		service := Service{Name: name}
+		if err != nil {
+			service.ActiveState = "unavailable"
+			services = append(services, service)
+			continue
+		}
+		for _, line := range strings.Split(string(output), "\n") {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			switch parts[0] {
+			case "LoadState":
+				service.LoadState = parts[1]
+			case "ActiveState":
+				service.ActiveState = parts[1]
+			case "SubState":
+				service.SubState = parts[1]
+			}
+		}
+		services = append(services, service)
+	}
+	return services
+}
+
+func collectDocker(enabled bool) []Container {
+	if !enabled {
+		return nil
+	}
+	output, err := exec.Command("docker", "ps", "-a", "--format", "{{json .}}").Output()
+	if err != nil {
+		return nil
+	}
+	containers := make([]Container, 0)
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if line == "" {
+			continue
+		}
+		var item struct {
+			ID    string `json:"ID"`
+			Names string `json:"Names"`
+			State string `json:"State"`
+		}
+		if json.Unmarshal([]byte(line), &item) == nil {
+			containers = append(containers, Container{ID: item.ID, Name: item.Names, State: item.State})
+		}
+	}
+	stats, err := exec.Command("docker", "stats", "--no-stream", "--format", "{{json .}}").Output()
+	if err != nil {
+		return containers
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(stats)), "\n") {
+		var item struct {
+			Name   string `json:"Name"`
+			CPU    string `json:"CPUPerc"`
+			Memory string `json:"MemUsage"`
+		}
+		if json.Unmarshal([]byte(line), &item) != nil {
+			continue
+		}
+		for index, container := range containers {
+			if container.Name == item.Name {
+				containers[index].CPUPercent = item.CPU
+				containers[index].MemoryUsage = item.Memory
+			}
+		}
+	}
+	return containers
+}
+
+func validUnit(name string) bool { return name != "" && !strings.ContainsAny(name, "\r\n;|&") }
 
 func (c *Collector) collectDevices() ([]Disk, []Network) {
 	now := time.Now()
@@ -104,7 +208,7 @@ func (c *Collector) collectDevices() ([]Disk, []Network) {
 		}
 		stat, ok := diskStats[partition.Device]
 		previous := c.disks[partition.Device]
-		disks = append(disks, Disk{Mountpoint: partition.Mountpoint, UsedBytes: usage.Used, FreeBytes: usage.Free, UsedPercent: usage.UsedPercent, ReadBytesPerSecond: rate(stat.ReadBytes, previous.ReadBytes, elapsed, ok), WriteBytesPerSecond: rate(stat.WriteBytes, previous.WriteBytes, elapsed, ok)})
+		disks = append(disks, Disk{Mountpoint: partition.Mountpoint, UsedBytes: usage.Used, FreeBytes: usage.Free, UsedPercent: finite(usage.UsedPercent), ReadBytesPerSecond: rate(stat.ReadBytes, previous.ReadBytes, elapsed, ok), WriteBytesPerSecond: rate(stat.WriteBytes, previous.WriteBytes, elapsed, ok)})
 		if ok {
 			c.disks[partition.Device] = stat
 		}
@@ -124,7 +228,7 @@ func collectTemperatures() []Temperature {
 	values, _ := sensors.SensorsTemperatures()
 	temperatures := make([]Temperature, 0, len(values))
 	for _, value := range values {
-		temperatures = append(temperatures, Temperature{Sensor: value.SensorKey, Celsius: value.Temperature})
+		temperatures = append(temperatures, Temperature{Sensor: value.SensorKey, Celsius: finite(value.Temperature)})
 	}
 	return temperatures
 }
@@ -134,6 +238,13 @@ func rate(current, previous uint64, elapsed float64, valid bool) float64 {
 		return 0
 	}
 	return float64(current-previous) / elapsed
+}
+
+func finite(value float64) float64 {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0
+	}
+	return value
 }
 
 func first(values []float64) float64 {

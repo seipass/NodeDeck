@@ -9,9 +9,11 @@ import (
 )
 
 type Config struct {
-	Listen Listen        `yaml:"listen"`
-	Token  string        `yaml:"token"`
-	Update time.Duration `yaml:"update_interval"`
+	Listen   Listen        `yaml:"listen"`
+	Token    string        `yaml:"token"`
+	Update   time.Duration `yaml:"update_interval"`
+	Services []string      `yaml:"services"`
+	Docker   bool          `yaml:"docker"`
 }
 
 type Listen struct {

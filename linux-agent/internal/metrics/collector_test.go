@@ -18,7 +18,7 @@ func TestRateRejectsCounterReset(t *testing.T) {
 }
 
 func TestCollectorCollectsOptionalMetrics(t *testing.T) {
-	collector := NewCollector()
+	collector := NewCollector(nil, false)
 	snapshot, err := collector.Collect(context.Background())
 	if err != nil {
 		t.Fatal(err)

@@ -14144,6 +14144,14 @@ function selectMetric(snapshot, settings) {
             const item = snapshot.data.network?.find((entry) => entry.interface === settings.device) ?? snapshot.data.network?.[0];
             return item === undefined ? undefined : rateMetric(item.interface, item.rxBytesPerSecond);
         }
+        case "service": {
+            const item = snapshot.data.services?.find((entry) => entry.name === settings.device) ?? snapshot.data.services?.[0];
+            return item === undefined ? undefined : { label: item.name, value: item.activeState === "active" ? 1 : 0, unit: item.activeState };
+        }
+        case "docker": {
+            const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0];
+            return item === undefined ? undefined : { label: item.name, value: item.state === "running" ? 1 : 0, unit: item.state };
+        }
         default: return undefined;
     }
 }

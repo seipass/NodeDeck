@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -53,8 +54,10 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		}
 		var incoming message
 		if err := connection.ReadJSON(&incoming); err != nil {
+			slog.Error("websocket read failed", "error", err)
 			return
 		}
+		slog.Info("websocket message", "type", incoming.Type)
 		if strings.EqualFold(incoming.Type, "ping") {
 			_ = connection.WriteJSON(map[string]string{"type": "pong"})
 			continue
@@ -74,7 +77,12 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 				continue
 			}
 			payload, marshalErr := json.Marshal(metricMessage{Type: "metrics", Protocol: "streamdeck-monitor", Version: 1, Timestamp: snapshot.Timestamp, Data: snapshot})
-			if marshalErr != nil || connection.WriteMessage(websocket.TextMessage, payload) != nil {
+			if marshalErr != nil {
+				slog.Error("metrics marshal failed", "error", marshalErr)
+				return
+			}
+			if connection.WriteMessage(websocket.TextMessage, payload) != nil {
+				slog.Error("metrics write failed")
 				return
 			}
 		}
