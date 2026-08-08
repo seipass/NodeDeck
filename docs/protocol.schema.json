@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nodedeck:streamdeck-monitor:protocol:v1",
+  "title": "NodeDeck Monitor WebSocket Protocol v1",
+  "oneOf": [
+    { "$ref": "#/$defs/hello" },
+    { "$ref": "#/$defs/subscribe" },
+    { "$ref": "#/$defs/ping" },
+    { "$ref": "#/$defs/helloAck" },
+    { "$ref": "#/$defs/metrics" },
+    { "$ref": "#/$defs/pong" },
+    { "$ref": "#/$defs/error" }
+  ],
+  "$defs": {
+    "protocolVersion": { "const": 1 },
+    "protocolName": { "const": "streamdeck-monitor" },
+    "metricFamily": {
+      "enum": ["cpu", "memory", "temperature", "disk", "network", "services", "docker", "custom"]
+    },
+    "hello": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "protocol", "version", "token"],
+      "properties": {
+        "type": { "const": "hello" },
+        "protocol": { "$ref": "#/$defs/protocolName" },
+        "version": { "$ref": "#/$defs/protocolVersion" },
+        "token": { "type": "string", "minLength": 1 }
+      }
+    },
+    "subscribe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "metrics"],
+      "properties": {
+        "type": { "const": "subscribe" },
+        "metrics": { "type": "array", "items": { "$ref": "#/$defs/metricFamily" }, "uniqueItems": true }
+      }
+    },
+    "ping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": { "type": { "const": "ping" } }
+    },
+    "helloAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "protocol", "version", "capabilities"],
+      "properties": {
+        "type": { "const": "hello_ack" },
+        "protocol": { "$ref": "#/$defs/protocolName" },
+        "version": { "$ref": "#/$defs/protocolVersion" },
+        "capabilities": { "type": "array", "items": { "$ref": "#/$defs/metricFamily" }, "uniqueItems": true }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "protocol", "version", "timestamp", "data"],
+      "properties": {
+        "type": { "const": "metrics" },
+        "protocol": { "$ref": "#/$defs/protocolName" },
+        "version": { "$ref": "#/$defs/protocolVersion" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "data": { "$ref": "#/$defs/metricData" }
+      }
+    },
+    "metricData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu", "memory"],
+      "properties": {
+        "cpu": {
+          "type": "object", "additionalProperties": false,
+          "required": ["usagePercent", "cores", "load1", "load5", "load15"],
+          "properties": {
+            "usagePercent": { "type": "number" }, "cores": { "type": "array", "items": { "type": "number" } },
+            "load1": { "type": "number" }, "load5": { "type": "number" }, "load15": { "type": "number" }
+          }
+        },
+        "memory": {
+          "type": "object", "additionalProperties": false,
+          "required": ["usedBytes", "availableBytes", "usedPercent", "swapUsedBytes", "swapUsedPercent"],
+          "properties": {
+            "usedBytes": { "type": "number", "minimum": 0 }, "availableBytes": { "type": "number", "minimum": 0 },
+            "usedPercent": { "type": "number" }, "swapUsedBytes": { "type": "number", "minimum": 0 }, "swapUsedPercent": { "type": "number" }
+          }
+        },
+        "temperature": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["sensor", "celsius"], "properties": { "sensor": { "type": "string" }, "celsius": { "type": "number" } } } },
+        "disks": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["mountpoint", "usedBytes", "freeBytes", "usedPercent", "readBytesPerSecond", "writeBytesPerSecond"], "properties": { "mountpoint": { "type": "string" }, "usedBytes": { "type": "number", "minimum": 0 }, "freeBytes": { "type": "number", "minimum": 0 }, "usedPercent": { "type": "number" }, "readBytesPerSecond": { "type": "number" }, "writeBytesPerSecond": { "type": "number" } } } },
+        "network": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["interface", "rxBytesPerSecond", "txBytesPerSecond", "rxBytes", "txBytes"], "properties": { "interface": { "type": "string" }, "rxBytesPerSecond": { "type": "number" }, "txBytesPerSecond": { "type": "number" }, "rxBytes": { "type": "number", "minimum": 0 }, "txBytes": { "type": "number", "minimum": 0 } } } },
+        "services": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["name", "loadState", "activeState", "subState"], "properties": { "name": { "type": "string" }, "loadState": { "type": "string" }, "activeState": { "type": "string" }, "subState": { "type": "string" } } } },
+        "docker": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["id", "name", "state", "uptimeSeconds", "cpuPercent", "memoryUsageBytes", "memoryLimitBytes"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "state": { "type": "string" }, "uptimeSeconds": { "type": "integer", "minimum": 0 }, "cpuPercent": { "type": "number" }, "memoryUsageBytes": { "type": "number", "minimum": 0 }, "memoryLimitBytes": { "type": "number", "minimum": 0 } } } },
+        "custom": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["id", "status", "exitCode"], "properties": { "id": { "type": "string" }, "status": { "type": "string" }, "value": { "type": "string" }, "exitCode": { "type": "integer" }, "stdout": { "type": "string" }, "stderr": { "type": "string" }, "lastSuccessAt": { "type": "string", "format": "date-time" } } } }
+      }
+    },
+    "pong": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type"], "properties": { "type": { "const": "pong" } }
+    },
+    "error": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "code"],
+      "properties": { "type": { "const": "error" }, "code": { "type": "string", "minLength": 1 }, "message": { "type": "string" }, "retryable": { "type": "boolean" } }
+    }
+  }
+}
