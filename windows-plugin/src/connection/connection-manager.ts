@@ -14,6 +14,6 @@ export class ConnectionManager {
   }
 
   public reconnectAll(): void {
-    for (const connection of this.connections.values()) connection.start();
+    for (const connection of this.connections.values()) connection.reconnect();
   }
 }

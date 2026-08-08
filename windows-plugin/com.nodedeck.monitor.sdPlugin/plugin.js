@@ -14058,11 +14058,14 @@ class AgentConnection {
     listeners = new Set();
     authenticated = false;
     staleTimer;
+    generation = 0;
     constructor(url, token) {
         this.url = url;
         this.token = token;
     }
-    start() { this.connect(); }
+    start() { if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING)
+        return; this.connect(); }
+    reconnect() { this.socket?.close(); this.socket = undefined; this.authenticated = false; this.start(); }
     stop() {
         if (this.timer !== undefined)
             clearTimeout(this.timer);
@@ -14074,11 +14077,14 @@ class AgentConnection {
     }
     on(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
     connect() {
+        const generation = ++this.generation;
         this.state = "connecting";
         this.notify();
         const socket = new WebSocket(this.url);
         this.socket = socket;
         socket.on("open", () => {
+            if (generation !== this.generation)
+                return;
             socket.send(JSON.stringify({ type: "hello", protocol: "streamdeck-monitor", version: 1, token: this.token }));
             socket.send(JSON.stringify({ type: "subscribe", metrics: ["cpu", "memory"] }));
             this.staleTimer = setInterval(() => { if (this.state === "online") {
@@ -14087,6 +14093,8 @@ class AgentConnection {
             } }, 5_000);
         });
         socket.on("message", (raw) => {
+            if (generation !== this.generation)
+                return;
             let message;
             try {
                 message = parseAgentMessage(JSON.parse(raw.toString()));
@@ -14113,8 +14121,10 @@ class AgentConnection {
                     socket.close();
             }
         });
-        socket.on("close", () => this.scheduleReconnect());
-        socket.on("error", () => this.notify());
+        socket.on("close", () => { if (generation === this.generation)
+            this.scheduleReconnect(); });
+        socket.on("error", () => { if (generation === this.generation)
+            this.notify(); });
     }
     scheduleReconnect() {
         if (this.state === "authentication-error")
@@ -14142,7 +14152,7 @@ class ConnectionManager {
     }
     reconnectAll() {
         for (const connection of this.connections.values())
-            connection.start();
+            connection.reconnect();
     }
 }
 

@@ -12,10 +12,13 @@ export class AgentConnection {
   private readonly listeners = new Set<Listener>();
   private authenticated = false;
   private staleTimer: NodeJS.Timeout | undefined;
+  private generation = 0;
 
   public constructor(private readonly url: string, private readonly token: string) {}
 
-  public start(): void { this.connect(); }
+  public start(): void { if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) return; this.connect(); }
+
+  public reconnect(): void { this.socket?.close(); this.socket = undefined; this.authenticated = false; this.start(); }
 
   public stop(): void {
     if (this.timer !== undefined) clearTimeout(this.timer);
@@ -28,16 +31,19 @@ export class AgentConnection {
   public on(listener: Listener): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
 
   private connect(): void {
+    const generation = ++this.generation;
     this.state = "connecting";
     this.notify();
     const socket = new WebSocket(this.url);
     this.socket = socket;
     socket.on("open", () => {
+      if (generation !== this.generation) return;
       socket.send(JSON.stringify({ type: "hello", protocol: "streamdeck-monitor", version: 1, token: this.token }));
       socket.send(JSON.stringify({ type: "subscribe", metrics: ["cpu", "memory"] }));
       this.staleTimer = setInterval(() => { if (this.state === "online") { this.state = "metric-unavailable"; this.notify(); } }, 5_000);
     });
     socket.on("message", (raw: Buffer) => {
+      if (generation !== this.generation) return;
       let message; try { message = parseAgentMessage(JSON.parse(raw.toString()) as unknown); } catch { this.state = "agent-error"; this.notify(); return; }
       if (message?.type === "hello_ack") {
         this.authenticated = true;
@@ -48,8 +54,8 @@ export class AgentConnection {
       if (message?.type === "metrics" && this.authenticated) { this.state = "online"; this.notify(message); }
       if (message?.type === "error") { this.state = message.code === "AUTH_FAILED" ? "authentication-error" : "agent-error"; this.notify(); if (message.code === "AUTH_FAILED") socket.close(); }
     });
-    socket.on("close", () => this.scheduleReconnect());
-    socket.on("error", () => this.notify());
+    socket.on("close", () => { if (generation === this.generation) this.scheduleReconnect(); });
+    socket.on("error", () => { if (generation === this.generation) this.notify(); });
   }
 
   private scheduleReconnect(): void {
