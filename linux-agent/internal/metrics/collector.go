@@ -126,7 +126,7 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 		CPU:         CPU{UsagePercent: finite(first(usage)), Cores: cores},
 		Memory:      Memory{UsedBytes: memory.Used, AvailableBytes: memory.Available, UsedPercent: finite(memory.UsedPercent)},
 		Temperature: temperatures, Disks: disks, Network: networks,
-		Services: collectServices(c.services), Docker: collectDocker(c.docker), Custom: c.collectCustom(ctx, time.Now()),
+		Services: collectServices(ctx, c.services), Docker: collectDocker(ctx, c.docker), Custom: c.collectCustom(ctx, time.Now()),
 	}, nil
 }
 
@@ -203,13 +203,15 @@ func runCustom(parent context.Context, id string, definition config.CustomMetric
 	return result
 }
 
-func collectServices(names []string) []Service {
+func collectServices(parent context.Context, names []string) []Service {
 	services := make([]Service, 0, len(names))
 	for _, name := range names {
 		if !validUnit(name) {
 			continue
 		}
-		output, err := exec.Command("systemctl", "show", "--no-page", "--property=LoadState,ActiveState,SubState", name).Output()
+		ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+		output, err := exec.CommandContext(ctx, "systemctl", "show", "--no-page", "--property=LoadState,ActiveState,SubState", name).Output()
+		cancel()
 		service := Service{Name: name}
 		if err != nil {
 			service.ActiveState = "unavailable"
@@ -235,11 +237,13 @@ func collectServices(names []string) []Service {
 	return services
 }
 
-func collectDocker(enabled bool) []Container {
+func collectDocker(parent context.Context, enabled bool) []Container {
 	if !enabled {
 		return nil
 	}
-	output, err := exec.Command("docker", "ps", "-a", "--format", "{{json .}}").Output()
+	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+	output, err := exec.CommandContext(ctx, "docker", "ps", "-a", "--format", "{{json .}}").Output()
+	cancel()
 	if err != nil {
 		return nil
 	}
@@ -257,7 +261,9 @@ func collectDocker(enabled bool) []Container {
 			containers = append(containers, Container{ID: item.ID, Name: item.Names, State: item.State})
 		}
 	}
-	stats, err := exec.Command("docker", "stats", "--no-stream", "--format", "{{json .}}").Output()
+	ctx, cancel = context.WithTimeout(parent, 2*time.Second)
+	stats, err := exec.CommandContext(ctx, "docker", "stats", "--no-stream", "--format", "{{json .}}").Output()
+	cancel()
 	if err != nil {
 		return containers
 	}
