@@ -58,6 +58,14 @@ func TestParsePercentRemovesSuffix(t *testing.T) {
 	}
 }
 
+func TestUptimeSecondsUsesWholeElapsedSeconds(t *testing.T) {
+	started := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := started.Add(65*time.Second + 900*time.Millisecond)
+	if got := uptimeSeconds(started, now); got != 65 {
+		t.Fatalf("uptime = %d, want 65", got)
+	}
+}
+
 func TestRunCustomExecutesArgvAndCapturesOutput(t *testing.T) {
 	definition := helperDefinition(t, 2*time.Second, "success")
 	result := runCustom(context.Background(), "players", definition)

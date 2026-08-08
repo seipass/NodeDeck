@@ -71,6 +71,7 @@ type Container struct {
 	ID               string  `json:"id"`
 	Name             string  `json:"name"`
 	State            string  `json:"state"`
+	UptimeSeconds    int64   `json:"uptimeSeconds,omitempty"`
 	CPUPercent       float64 `json:"cpuPercent,omitempty"`
 	MemoryUsageBytes uint64  `json:"memoryUsageBytes,omitempty"`
 	MemoryLimitBytes uint64  `json:"memoryLimitBytes,omitempty"`
@@ -284,7 +285,50 @@ func collectDocker(parent context.Context, enabled bool) []Container {
 			}
 		}
 	}
+	inspectArgs := []string{"inspect", "--format", "{{json .}}"}
+	for _, container := range containers {
+		inspectArgs = append(inspectArgs, container.ID)
+	}
+	if len(containers) == 0 {
+		return containers
+	}
+	ctx, cancel = context.WithTimeout(parent, 2*time.Second)
+	inspected, err := exec.CommandContext(ctx, "docker", inspectArgs...).Output()
+	cancel()
+	if err != nil {
+		return containers
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(inspected)), "\n") {
+		var item struct {
+			ID    string `json:"Id"`
+			State struct {
+				StartedAt string `json:"StartedAt"`
+			} `json:"State"`
+		}
+		if json.Unmarshal([]byte(line), &item) != nil {
+			continue
+		}
+		started, parseErr := time.Parse(time.RFC3339Nano, item.State.StartedAt)
+		if parseErr != nil || started.IsZero() {
+			continue
+		}
+		for index, container := range containers {
+			if container.State == "running" && strings.HasPrefix(item.ID, container.ID) {
+				uptime := uptimeSeconds(started, time.Now())
+				if uptime > 0 {
+					containers[index].UptimeSeconds = uptime
+				}
+			}
+		}
+	}
 	return containers
+}
+
+func uptimeSeconds(started, now time.Time) int64 {
+	if started.IsZero() || !now.After(started) {
+		return 0
+	}
+	return int64(now.Sub(started).Seconds())
 }
 
 func parsePercent(value string) float64 {
