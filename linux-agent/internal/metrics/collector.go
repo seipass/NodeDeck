@@ -96,6 +96,12 @@ type Collector struct {
 	custom        map[string]config.CustomMetric
 	customLast    map[string]time.Time
 	customResults map[string]CustomMetric
+	temperatureAt time.Time
+	temperatures  []Temperature
+	servicesAt    time.Time
+	serviceValues []Service
+	dockerAt      time.Time
+	dockerValues  []Container
 }
 
 func NewCollector(services []string, dockerEnabled bool, custom map[string]config.CustomMetric) Collector {
@@ -103,6 +109,7 @@ func NewCollector(services []string, dockerEnabled bool, custom map[string]confi
 }
 
 func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
+	now := time.Now().UTC()
 	usage, err := cpu.PercentWithContext(ctx, 0, false)
 	if err != nil {
 		return Snapshot{}, err
@@ -117,8 +124,8 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 	}
 	c.mu.Lock()
 	disks, networks := c.collectDevices()
-	temperatures := collectTemperatures()
 	c.mu.Unlock()
+	temperatures := c.collectTemperaturesCached(now)
 	for index, core := range cores {
 		cores[index] = finite(core)
 	}
@@ -127,8 +134,41 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 		CPU:         CPU{UsagePercent: finite(first(usage)), Cores: cores},
 		Memory:      Memory{UsedBytes: memory.Used, AvailableBytes: memory.Available, UsedPercent: finite(memory.UsedPercent)},
 		Temperature: temperatures, Disks: disks, Network: networks,
-		Services: collectServices(ctx, c.services), Docker: collectDocker(ctx, c.docker), Custom: c.collectCustom(ctx, time.Now()),
+		Services: c.collectServicesCached(ctx, now), Docker: c.collectDockerCached(ctx, now), Custom: c.collectCustom(ctx, now),
 	}, nil
+}
+
+func (c *Collector) collectTemperaturesCached(now time.Time) []Temperature {
+	if !c.temperatureAt.IsZero() && now.Sub(c.temperatureAt) < 2*time.Second {
+		return c.temperatures
+	}
+	values := collectTemperatures()
+	c.mu.Lock()
+	c.temperatureAt, c.temperatures = now, values
+	c.mu.Unlock()
+	return values
+}
+
+func (c *Collector) collectServicesCached(ctx context.Context, now time.Time) []Service {
+	if !c.servicesAt.IsZero() && now.Sub(c.servicesAt) < 5*time.Second {
+		return c.serviceValues
+	}
+	values := collectServices(ctx, c.services)
+	c.mu.Lock()
+	c.servicesAt, c.serviceValues = now, values
+	c.mu.Unlock()
+	return values
+}
+
+func (c *Collector) collectDockerCached(ctx context.Context, now time.Time) []Container {
+	if !c.dockerAt.IsZero() && now.Sub(c.dockerAt) < 2*time.Second {
+		return c.dockerValues
+	}
+	values := collectDocker(ctx, c.docker)
+	c.mu.Lock()
+	c.dockerAt, c.dockerValues = now, values
+	c.mu.Unlock()
+	return values
 }
 
 func (c *Collector) collectCustom(parent context.Context, now time.Time) []CustomMetric {
