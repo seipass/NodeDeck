@@ -48,42 +48,74 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 	if err := connection.WriteJSON(helloAck{Type: "hello_ack", Protocol: "streamdeck-monitor", Version: 1, Capabilities: []string{"cpu", "memory", "temperature", "disk", "network"}}); err != nil {
 		return
 	}
+	if err := h.runSession(connection); err != nil {
+		slog.Error("websocket session ended", "error", err)
+	}
+}
+
+func (h Handler) runSession(connection *websocket.Conn) error {
+	incoming := make(chan message, 4)
+	errors := make(chan error, 1)
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		for {
+			var next message
+			if err := connection.ReadJSON(&next); err != nil {
+				select {
+				case errors <- err:
+				case <-done:
+				}
+				return
+			}
+			select {
+			case incoming <- next:
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	metricsTicker := time.NewTicker(time.Second)
+	defer metricsTicker.Stop()
+	heartbeatTicker := time.NewTicker(15 * time.Second)
+	defer heartbeatTicker.Stop()
+	subscribed := false
 	for {
-		if err := connection.SetReadDeadline(time.Now().Add(45 * time.Second)); err != nil {
-			return
-		}
-		var incoming message
-		if err := connection.ReadJSON(&incoming); err != nil {
-			slog.Error("websocket read failed", "error", err)
-			return
-		}
-		slog.Info("websocket message", "type", incoming.Type)
-		if strings.EqualFold(incoming.Type, "ping") {
-			_ = connection.WriteJSON(map[string]string{"type": "pong"})
-			continue
-		}
-		if incoming.Type != "subscribe" {
-			_ = connection.WriteJSON(map[string]string{"type": "error", "code": "INVALID_MESSAGE"})
-			continue
-		}
-		if err := connection.SetReadDeadline(time.Time{}); err != nil {
-			return
-		}
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
+		select {
+		case err := <-errors:
+			return err
+		case next := <-incoming:
+			switch {
+			case strings.EqualFold(next.Type, "ping"):
+				if err := connection.WriteJSON(map[string]string{"type": "pong"}); err != nil {
+					return err
+				}
+			case next.Type == "subscribe":
+				subscribed = true
+			case next.Type != "":
+				if err := connection.WriteJSON(map[string]string{"type": "error", "code": "INVALID_MESSAGE"}); err != nil {
+					return err
+				}
+			}
+		case <-metricsTicker.C:
+			if !subscribed {
+				continue
+			}
 			snapshot, ready := h.store.Snapshot()
 			if !ready {
 				continue
 			}
-			payload, marshalErr := json.Marshal(metricMessage{Type: "metrics", Protocol: "streamdeck-monitor", Version: 1, Timestamp: snapshot.Timestamp, Data: snapshot})
-			if marshalErr != nil {
-				slog.Error("metrics marshal failed", "error", marshalErr)
-				return
+			payload, err := json.Marshal(metricMessage{Type: "metrics", Protocol: "streamdeck-monitor", Version: 1, Timestamp: snapshot.Timestamp, Data: snapshot})
+			if err != nil {
+				return err
 			}
-			if connection.WriteMessage(websocket.TextMessage, payload) != nil {
-				slog.Error("metrics write failed")
-				return
+			if err := connection.WriteMessage(websocket.TextMessage, payload); err != nil {
+				return err
+			}
+		case <-heartbeatTicker.C:
+			if err := connection.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second)); err != nil {
+				return err
 			}
 		}
 	}

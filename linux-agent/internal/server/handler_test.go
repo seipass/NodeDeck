@@ -36,6 +36,20 @@ func TestHandlerPushesMetricsAfterSubscribe(t *testing.T) {
 	if err := connection.WriteJSON(message{Type: "subscribe", Metrics: []string{"cpu"}}); err != nil {
 		t.Fatal(err)
 	}
+	if err := connection.WriteJSON(message{Type: "ping"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := connection.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	var pong struct {
+		Type string `json:"type"`
+	}
+	for pong.Type != "pong" {
+		if err := connection.ReadJSON(&pong); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := connection.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
 		t.Fatal(err)
 	}

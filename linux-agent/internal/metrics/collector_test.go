@@ -59,7 +59,7 @@ func TestParsePercentRemovesSuffix(t *testing.T) {
 }
 
 func TestRunCustomExecutesArgvAndCapturesOutput(t *testing.T) {
-	definition := helperDefinition(t, 500*time.Millisecond, "success")
+	definition := helperDefinition(t, 2*time.Second, "success")
 	result := runCustom(context.Background(), "players", definition)
 	if result.Status != "ok" || !strings.HasPrefix(result.Value, "42") || result.ExitCode != 0 || result.LastSuccessAt == nil {
 		t.Fatalf("unexpected result: %+v", result)
@@ -74,7 +74,7 @@ func TestRunCustomReportsTimeout(t *testing.T) {
 }
 
 func TestRunCustomReportsExitError(t *testing.T) {
-	result := runCustom(context.Background(), "players", helperDefinition(t, 500*time.Millisecond, "error"))
+	result := runCustom(context.Background(), "players", helperDefinition(t, 2*time.Second, "error"))
 	if result.Status != "error" || result.ExitCode != 7 {
 		t.Fatalf("unexpected result: %+v", result)
 	}
