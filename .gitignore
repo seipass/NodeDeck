@@ -1,5 +1,6 @@
 .codegraph/
 windows-plugin/node_modules/
 windows-plugin/dist/
+windows-plugin/com.nodedeck.monitor.sdPlugin/logs/
 linux-agent/*.exe
 linux-agent/*.out
