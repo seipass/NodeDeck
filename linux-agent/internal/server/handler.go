@@ -12,13 +12,17 @@ import (
 )
 
 type Handler struct {
-	store    *metrics.Store
-	token    string
-	upgrader websocket.Upgrader
+	store        *metrics.Store
+	token        string
+	capabilities []string
+	upgrader     websocket.Upgrader
 }
 
-func NewHandler(store *metrics.Store, token string) http.Handler {
-	return Handler{store: store, token: token, upgrader: websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}}
+func NewHandler(store *metrics.Store, token string, capabilities ...string) http.Handler {
+	if len(capabilities) == 0 {
+		capabilities = []string{"cpu", "memory", "temperature", "disk", "network", "services", "docker", "custom"}
+	}
+	return Handler{store: store, token: token, capabilities: append([]string(nil), capabilities...), upgrader: websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}}
 }
 
 type message struct {
@@ -45,7 +49,7 @@ func (h Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		_ = connection.WriteJSON(map[string]string{"type": "error", "code": "AUTH_FAILED"})
 		return
 	}
-	if err := connection.WriteJSON(helloAck{Type: "hello_ack", Protocol: "streamdeck-monitor", Version: 1, Capabilities: []string{"cpu", "memory", "temperature", "disk", "network", "services", "docker", "custom"}}); err != nil {
+	if err := connection.WriteJSON(helloAck{Type: "hello_ack", Protocol: "streamdeck-monitor", Version: 1, Capabilities: h.capabilities}); err != nil {
 		return
 	}
 	if err := h.runSession(connection); err != nil {

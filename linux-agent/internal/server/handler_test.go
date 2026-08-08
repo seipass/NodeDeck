@@ -15,7 +15,7 @@ func TestHandlerPushesMetricsAfterSubscribe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go store.Run(ctx, metrics.NewCollector(nil, false, nil), 50*time.Millisecond)
-	server := httptest.NewServer(NewHandler(store, "secret"))
+	server := httptest.NewServer(NewHandler(store, "secret", "cpu", "memory"))
 	defer server.Close()
 	url := "ws" + server.URL[len("http"):] + "/ws"
 	connection, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -32,6 +32,9 @@ func TestHandlerPushesMetricsAfterSubscribe(t *testing.T) {
 	}
 	if ack.Type != "hello_ack" {
 		t.Fatalf("ack type = %q", ack.Type)
+	}
+	if len(ack.Capabilities) != 2 || ack.Capabilities[0] != "cpu" || ack.Capabilities[1] != "memory" {
+		t.Fatalf("unexpected capabilities: %+v", ack.Capabilities)
 	}
 	if err := connection.WriteJSON(message{Type: "subscribe", Metrics: []string{"cpu"}}); err != nil {
 		t.Fatal(err)

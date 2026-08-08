@@ -56,7 +56,17 @@ func run() error {
 	store := metrics.NewStore()
 	go store.Run(ctx, collector, settings.Update)
 
-	handler := server.NewHandler(store, settings.Token)
+	capabilities := []string{"cpu", "memory", "temperature", "disk", "network"}
+	if len(settings.Services) > 0 {
+		capabilities = append(capabilities, "services")
+	}
+	if settings.Docker {
+		capabilities = append(capabilities, "docker")
+	}
+	if len(settings.CustomMetrics) > 0 {
+		capabilities = append(capabilities, "custom")
+	}
+	handler := server.NewHandler(store, settings.Token, capabilities...)
 	server := &http.Server{Addr: settings.Listen.Host + ":" + settings.Listen.Port, Handler: handler}
 	go func() {
 		<-ctx.Done()
