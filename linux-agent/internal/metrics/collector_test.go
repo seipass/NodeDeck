@@ -36,6 +36,13 @@ func TestCollectorCollectsOptionalMetrics(t *testing.T) {
 	}
 }
 
+func TestCollectDockerReturnsEmptyWhenDockerIsUnavailable(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	if values := collectDocker(context.Background(), true); len(values) != 0 {
+		t.Fatalf("docker values = %+v, want empty", values)
+	}
+}
+
 func TestCappedBufferLimitsOutputWithoutFailingProcess(t *testing.T) {
 	buffer := &cappedBuffer{limit: 4}
 	if _, err := buffer.Write([]byte("abcdef")); err != nil {
