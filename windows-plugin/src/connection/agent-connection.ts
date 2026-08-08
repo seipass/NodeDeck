@@ -10,6 +10,7 @@ export class AgentConnection {
   private timer: NodeJS.Timeout | undefined;
   private state: ConnectionState = "offline";
   private readonly listeners = new Set<Listener>();
+  private authenticated = false;
 
   public constructor(private readonly url: string, private readonly token: string) {}
 
@@ -19,6 +20,7 @@ export class AgentConnection {
     if (this.timer !== undefined) clearTimeout(this.timer);
     this.socket?.close();
     this.socket = undefined;
+    this.authenticated = false;
   }
 
   public on(listener: Listener): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
@@ -31,15 +33,19 @@ export class AgentConnection {
     socket.on("open", () => {
       socket.send(JSON.stringify({ type: "hello", protocol: "streamdeck-monitor", version: 1, token: this.token }));
       socket.send(JSON.stringify({ type: "subscribe", metrics: ["cpu", "memory"] }));
-      this.retryMs = 1_000;
     });
     socket.on("message", (raw: Buffer) => {
       const message = parseAgentMessage(JSON.parse(raw.toString()) as unknown);
-      if (message?.type === "hello_ack") { this.state = "online"; this.notify(); }
-      if (message?.type === "metrics") this.notify(message);
+      if (message?.type === "hello_ack") {
+        this.authenticated = true;
+        this.retryMs = 1_000;
+        this.state = "online";
+        this.notify();
+      }
+      if (message?.type === "metrics" && this.authenticated) this.notify(message);
     });
     socket.on("close", () => this.scheduleReconnect());
-    socket.on("error", () => undefined);
+    socket.on("error", () => this.notify());
   }
 
   private scheduleReconnect(): void {

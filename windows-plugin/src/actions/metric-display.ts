@@ -1,4 +1,4 @@
-import { SingletonAction, type WillAppearEvent, type WillDisappearEvent, type DidReceiveSettingsEvent } from "@elgato/streamdeck";
+import { SingletonAction, type WillAppearEvent, type DidReceiveSettingsEvent } from "@elgato/streamdeck";
 import type { ConnectionManager } from "../connection/connection-manager.js";
 import { renderCpu } from "../rendering/metric-renderer.js";
 
@@ -9,8 +9,6 @@ export class MetricDisplayAction extends SingletonAction<Settings> {
 
   public override onWillAppear(ev: WillAppearEvent<Settings>): void { this.connect(ev.action, ev.payload.settings); }
   public override onDidReceiveSettings(ev: DidReceiveSettingsEvent<Settings>): void { this.connect(ev.action, ev.payload.settings); }
-  public override onWillDisappear(): void { return; }
-
   private connect(action: WillAppearEvent<Settings>["action"], settings: Settings): void {
     const host = settings.host ?? "127.0.0.1";
     const port = settings.port ?? 8765;

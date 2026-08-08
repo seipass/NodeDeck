@@ -29,4 +29,6 @@ npm install
 npm run build
 ```
 
+The generated `com.nodedeck.monitor.sdPlugin/plugin.js` is the file referenced by the SDK manifest and can be copied into the Stream Deck plugins directory.
+
 The plugin source uses `@elgato/streamdeck` SDK 2 and targets the Node.js 24 runtime supported by Stream Deck 7.1+.

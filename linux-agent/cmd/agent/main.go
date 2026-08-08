@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hasilan/node-deck/linux-agent/internal/config"
 	"github.com/hasilan/node-deck/linux-agent/internal/metrics"
 	"github.com/hasilan/node-deck/linux-agent/internal/server"
 )
@@ -23,11 +24,29 @@ func main() {
 }
 
 func run() error {
-	port := flag.String("port", "8765", "WebSocket listen port")
-	token := flag.String("token", "", "authentication token")
-	interval := flag.Duration("interval", time.Second, "metric collection interval")
+	configPath := flag.String("config", "", "YAML configuration path")
+	port := flag.String("port", "", "override WebSocket listen port")
+	token := flag.String("token", "", "override authentication token")
+	interval := flag.Duration("interval", 0, "override metric collection interval")
 	flag.Parse()
-	if *token == "" {
+	settings := config.Defaults()
+	if *configPath != "" {
+		loaded, err := config.Load(*configPath)
+		if err != nil {
+			return err
+		}
+		settings = loaded
+	}
+	if *port != "" {
+		settings.Listen.Port = *port
+	}
+	if *token != "" {
+		settings.Token = *token
+	}
+	if *interval > 0 {
+		settings.Update = *interval
+	}
+	if settings.Token == "" {
 		return errors.New("token is required")
 	}
 
@@ -35,17 +54,17 @@ func run() error {
 	defer stop()
 	collector := metrics.NewCollector()
 	store := metrics.NewStore()
-	go store.Run(ctx, collector, *interval)
+	go store.Run(ctx, collector, settings.Update)
 
-	handler := server.NewHandler(store, *token)
-	server := &http.Server{Addr: ":" + *port, Handler: handler}
+	handler := server.NewHandler(store, settings.Token)
+	server := &http.Server{Addr: settings.Listen.Host + ":" + settings.Listen.Port, Handler: handler}
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
 	}()
-	slog.Info("agent listening", "port", *port, "interval", *interval)
+	slog.Info("agent listening", "port", settings.Listen.Port, "interval", settings.Update)
 	err := server.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil

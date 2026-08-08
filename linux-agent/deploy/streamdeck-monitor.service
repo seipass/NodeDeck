@@ -3,7 +3,7 @@ Description=NodeDeck Linux monitoring agent
 After=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/node-deck-agent -port 8765 -token CHANGE_ME
+ExecStart=/usr/local/bin/node-deck-agent -config /etc/streamdeck-monitor/config.yaml
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
