@@ -14048,6 +14048,7 @@ function parseAgentMessage(value) {
     return undefined;
 }
 
+const SUBSCRIBED_METRICS = ["cpu", "memory", "temperature", "disk", "network", "services", "docker", "custom"];
 class AgentConnection {
     url;
     token;
@@ -14114,7 +14115,7 @@ class AgentConnection {
                 this.retryMs = 1_000;
                 this.state = "online";
                 this.notify();
-                socket.send(JSON.stringify({ type: "subscribe", metrics: ["cpu", "memory"] }));
+                socket.send(JSON.stringify({ type: "subscribe", metrics: SUBSCRIBED_METRICS }));
             }
             if (message?.type === "metrics" && this.authenticated) {
                 this.state = "online";

@@ -1,6 +1,8 @@
 import WebSocket from "ws";
 import { parseAgentMessage, type MetricSnapshot } from "../protocol/messages.js";
 
+const SUBSCRIBED_METRICS = ["cpu", "memory", "temperature", "disk", "network", "services", "docker", "custom"] as const;
+
 export type ConnectionState = "connecting" | "online" | "offline" | "authentication-error" | "agent-error" | "metric-unavailable";
 type Listener = (state: ConnectionState, snapshot?: MetricSnapshot) => void;
 
@@ -58,7 +60,7 @@ export class AgentConnection {
         this.retryMs = 1_000;
         this.state = "online";
         this.notify();
-        socket.send(JSON.stringify({ type: "subscribe", metrics: ["cpu", "memory"] }));
+        socket.send(JSON.stringify({ type: "subscribe", metrics: SUBSCRIBED_METRICS }));
       }
       if (message?.type === "metrics" && this.authenticated) { this.state = "online"; this.notify(message); }
       if (message?.type === "error") { this.state = message.code === "AUTH_FAILED" ? "authentication-error" : "agent-error"; this.notify(); if (message.code === "AUTH_FAILED") socket.close(); }
