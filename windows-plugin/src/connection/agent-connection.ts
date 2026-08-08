@@ -32,6 +32,7 @@ export class AgentConnection {
   }
 
   public stop(): void {
+    this.generation += 1;
     this.clearReconnectTimer();
     this.socket?.close();
     this.socket = undefined;
@@ -70,10 +71,13 @@ export class AgentConnection {
   }
 
   private scheduleReconnect(): void {
-    if (this.state === "authentication-error") return;
+    if (this.state === "authentication-error" || this.timer !== undefined) return;
     this.state = "offline";
     this.notify();
-    this.timer = setTimeout(() => this.connect(), this.retryMs);
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      this.connect();
+    }, this.retryMs);
     this.retryMs = Math.min(this.retryMs * 2, 30_000);
   }
 

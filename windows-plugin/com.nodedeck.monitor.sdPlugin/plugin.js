@@ -14076,6 +14076,7 @@ class AgentConnection {
         this.start();
     }
     stop() {
+        this.generation += 1;
         this.clearReconnectTimer();
         this.socket?.close();
         this.socket = undefined;
@@ -14134,11 +14135,14 @@ class AgentConnection {
             this.notify(); });
     }
     scheduleReconnect() {
-        if (this.state === "authentication-error")
+        if (this.state === "authentication-error" || this.timer !== undefined)
             return;
         this.state = "offline";
         this.notify();
-        this.timer = setTimeout(() => this.connect(), this.retryMs);
+        this.timer = setTimeout(() => {
+            this.timer = undefined;
+            this.connect();
+        }, this.retryMs);
         this.retryMs = Math.min(this.retryMs * 2, 30_000);
     }
     notify(snapshot) { for (const listener of this.listeners)
