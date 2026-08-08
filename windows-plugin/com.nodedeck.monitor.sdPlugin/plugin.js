@@ -14335,18 +14335,20 @@ class MetricDisplayAction extends SingletonAction {
         this.subscriptions.get(action.id)?.();
         let lastState;
         let lastValue;
+        let lastDisplayValue;
         let lastRenderedAt = 0;
         this.subscriptions.set(action.id, connection.on((state, snapshot) => {
             const metric = snapshot === undefined ? undefined : selectMetric(snapshot, settings);
             const value = metric?.value;
             const now = Date.now();
-            if (state === lastState && value === lastValue)
+            if (state === lastState && value === lastValue && metric?.displayValue === lastDisplayValue)
                 return;
             const refreshInterval = Math.max(0, settings.refreshInterval ?? 1) * 1000;
             if (state === "online" && now - lastRenderedAt < refreshInterval)
                 return;
             lastState = state;
             lastValue = value;
+            lastDisplayValue = metric?.displayValue;
             lastRenderedAt = now;
             void action.setImage(metric === undefined ? renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, state === "online" ? "metric-unavailable" : state) : renderMetric({ label: settings.label ?? metric.label, value: metric.value, displayValue: metric.displayValue, unit: settings.unit ?? metric.unit, decimalPlaces: settings.decimalPlaces ?? 1, warningThreshold: settings.warningThreshold, criticalThreshold: settings.criticalThreshold }, state));
         }));
