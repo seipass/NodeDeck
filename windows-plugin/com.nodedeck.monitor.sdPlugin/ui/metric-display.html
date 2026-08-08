@@ -3,7 +3,7 @@
 <head><meta charset="utf-8"><script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script></head>
 <body>
   <sdpi-item label="Linux Host"><sdpi-textfield setting="host" placeholder="192.168.1.10"></sdpi-textfield></sdpi-item>
-  <sdpi-item label="Port"><sdpi-number setting="port" min="1" max="65535" default="8765"></sdpi-number></sdpi-item>
+  <sdpi-item label="Port"><sdpi-textfield setting="port" placeholder="8765"></sdpi-textfield></sdpi-item>
   <sdpi-item label="Token"><sdpi-textfield setting="token" type="password"></sdpi-textfield></sdpi-item>
   <sdpi-item label="Metric"><sdpi-select setting="metricType"><option value="cpu">CPU</option><option value="cpu-load1">CPU load 1m</option><option value="cpu-load5">CPU load 5m</option><option value="cpu-load15">CPU load 15m</option><option value="memory">Memory</option><option value="memory-swap">Swap usage</option><option value="temperature">Temperature</option><option value="disk">Disk usage</option><option value="disk-read">Disk read</option><option value="disk-write">Disk write</option><option value="network">Network download</option><option value="network-upload">Network upload</option><option value="service">systemd service</option><option value="docker">Docker state</option><option value="docker-cpu">Docker CPU</option><option value="docker-memory">Docker memory</option><option value="docker-uptime">Docker uptime</option><option value="custom">Custom metric</option></sdpi-select></sdpi-item>
   <sdpi-item label="Device"><sdpi-textfield setting="device" placeholder="eth0, /, or sensor"></sdpi-textfield></sdpi-item>

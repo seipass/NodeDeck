@@ -4,7 +4,7 @@ import { renderMetric } from "../rendering/metric-renderer.js";
 import { selectMetric, type MetricSettings } from "../metrics/selectors.js";
 import { parseConnectionSettings } from "../settings/settings.js";
 
-type Settings = Readonly<{ host?: string; port?: number; token?: string; metricType?: MetricSettings["metricType"]; device?: string; customMetricId?: string; label?: string; unit?: string; decimalPlaces?: number; refreshInterval?: number; warningThreshold?: number; criticalThreshold?: number }>;
+type Settings = Readonly<{ host?: string; port?: number | string; token?: string; metricType?: MetricSettings["metricType"]; device?: string; customMetricId?: string; label?: string; unit?: string; decimalPlaces?: number; refreshInterval?: number; warningThreshold?: number; criticalThreshold?: number }>;
 
 export class MetricDisplayAction extends SingletonAction<Settings> {
   private readonly subscriptions = new Map<string, () => void>();
