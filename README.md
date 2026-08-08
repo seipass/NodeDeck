@@ -13,6 +13,7 @@ NodeDeck displays Linux host metrics on an Elgato Stream Deck.
   seconds, and Custom Metrics at their configured intervals.
 - Dynamic SVG rendering with value, unit, gauge, warning/critical thresholds,
   and explicit connecting/offline/authentication-error states.
+- The wire contract is documented in [docs/protocol.md](docs/protocol.md).
 - Exponential reconnect backoff, heartbeat, sleep/wake reconnect, optional TLS,
   and bounded WebSocket/custom-command input.
 
