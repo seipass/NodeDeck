@@ -30,8 +30,8 @@ describe("AgentConnection integration", () => {
           return;
         }
         if (!text.includes('"type":"subscribe"')) return;
-        if (!text.includes('"docker"')) {
-          fail?.(new Error("plugin did not subscribe to the shared metric families"));
+        if (!text.includes('"cpu"') || !text.includes('"memory"') || text.includes('"docker"')) {
+          fail?.(new Error("plugin did not intersect its subscription with agent capabilities"));
           return;
         }
         socket.send(metricSnapshot(connectionCount));

@@ -65,7 +65,8 @@ export class AgentConnection {
         this.retryMs = 1_000;
         this.state = "online";
         this.notify();
-        socket.send(JSON.stringify({ type: "subscribe", metrics: SUBSCRIBED_METRICS }));
+        const metrics = SUBSCRIBED_METRICS.filter((metric) => message.capabilities.includes(metric));
+        socket.send(JSON.stringify({ type: "subscribe", metrics }));
       }
       if (message?.type === "metrics" && this.authenticated) {
         this.metricStore.update(message);
