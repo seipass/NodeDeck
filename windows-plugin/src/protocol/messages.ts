@@ -5,7 +5,7 @@ export type MetricSnapshot = Readonly<{
   timestamp: string;
   data: Readonly<{
     cpu: Readonly<{ usagePercent: number; cores: readonly number[]; load1: number; load5: number; load15: number }>;
-    memory: Readonly<{ usedBytes: number; availableBytes: number; usedPercent: number }>;
+    memory: Readonly<{ usedBytes: number; availableBytes: number; usedPercent: number; swapUsedBytes: number; swapUsedPercent: number }>;
     temperature?: readonly Readonly<{ sensor: string; celsius: number }>[];
     disks?: readonly Readonly<{ mountpoint: string; usedBytes: number; freeBytes: number; usedPercent: number; readBytesPerSecond: number; writeBytesPerSecond: number }>[];
     network?: readonly Readonly<{ interface: string; rxBytesPerSecond: number; txBytesPerSecond: number; rxBytes: number; txBytes: number }>[];

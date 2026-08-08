@@ -41,9 +41,11 @@ type CPU struct {
 }
 
 type Memory struct {
-	UsedBytes      uint64  `json:"usedBytes"`
-	AvailableBytes uint64  `json:"availableBytes"`
-	UsedPercent    float64 `json:"usedPercent"`
+	UsedBytes       uint64  `json:"usedBytes"`
+	AvailableBytes  uint64  `json:"availableBytes"`
+	UsedPercent     float64 `json:"usedPercent"`
+	SwapUsedBytes   uint64  `json:"swapUsedBytes"`
+	SwapUsedPercent float64 `json:"swapUsedPercent"`
 }
 
 type Temperature struct {
@@ -126,6 +128,10 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
+	swap, err := mem.SwapMemoryWithContext(ctx)
+	if err != nil {
+		return Snapshot{}, err
+	}
 	loadAverage, _ := load.AvgWithContext(ctx)
 	c.mu.Lock()
 	disks, networks := c.collectDevices()
@@ -137,7 +143,7 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 	return Snapshot{
 		Timestamp:   time.Now().UTC(),
 		CPU:         CPU{UsagePercent: finite(first(usage)), Cores: cores, Load1: finite(loadAverage.Load1), Load5: finite(loadAverage.Load5), Load15: finite(loadAverage.Load15)},
-		Memory:      Memory{UsedBytes: memory.Used, AvailableBytes: memory.Available, UsedPercent: finite(memory.UsedPercent)},
+		Memory:      Memory{UsedBytes: memory.Used, AvailableBytes: memory.Available, UsedPercent: finite(memory.UsedPercent), SwapUsedBytes: swap.Used, SwapUsedPercent: finite(swap.UsedPercent)},
 		Temperature: temperatures, Disks: disks, Network: networks,
 		Services: c.collectServicesCached(ctx, now), Docker: c.collectDockerCached(ctx, now), Custom: c.collectCustom(ctx, now),
 	}, nil
