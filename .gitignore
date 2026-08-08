@@ -1,0 +1,5 @@
+.codegraph/
+windows-plugin/node_modules/
+windows-plugin/dist/
+linux-agent/*.exe
+linux-agent/*.out

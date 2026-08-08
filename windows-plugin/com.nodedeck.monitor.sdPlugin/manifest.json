@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "Name": "NodeDeck Monitor",
+  "Version": "0.1.0",
+  "Author": "NodeDeck",
+  "Description": "Display Linux CPU and memory metrics.",
+  "Category": "Monitoring",
+  "SDKVersion": 2,
+  "CodePath": "plugin.js",
+  "Nodejs": {"Version": "24"},
+  "Actions": [
+    {
+      "Name": "Metric Display",
+      "UUID": "com.nodedeck.monitor.metric-display",
+      "Icon": "imgs/metric-display",
+      "Tooltip": "Display a Linux metric",
+      "PropertyInspectorPath": "ui/metric-display.html"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[Unit]
+Description=NodeDeck Linux monitoring agent
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/node-deck-agent -port 8765 -token CHANGE_ME
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

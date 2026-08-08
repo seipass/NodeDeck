@@ -1,0 +1,8 @@
+{
+  "name": "node-deck-plugin",
+  "private": true,
+  "type": "module",
+  "scripts": {"build": "tsc --noEmit"},
+  "dependencies": {"@elgato/streamdeck": "2.1.0", "ws": "8.18.0"},
+  "devDependencies": {"@types/node": "22.15.0", "@types/ws": "8.18.1", "typescript": "5.8.3"}
+}
