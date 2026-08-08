@@ -1,4 +1,4 @@
-import { SingletonAction, type WillAppearEvent, type WillDisappearEvent, type DidReceiveSettingsEvent } from "@elgato/streamdeck";
+import { action, SingletonAction, type WillAppearEvent, type WillDisappearEvent, type DidReceiveSettingsEvent } from "@elgato/streamdeck";
 import type { ConnectionManager } from "../connection/connection-manager.js";
 import { renderMetric } from "../rendering/metric-renderer.js";
 import { selectMetric, type MetricSettings } from "../metrics/selectors.js";
@@ -6,6 +6,7 @@ import { parseConnectionSettings } from "../settings/settings.js";
 
 type Settings = Readonly<{ host?: string; port?: number | string; token?: string; metricType?: MetricSettings["metricType"]; device?: string; customMetricId?: string; label?: string; unit?: string; decimalPlaces?: number; refreshInterval?: number; warningThreshold?: number; criticalThreshold?: number }>;
 
+@action({ UUID: "com.nodedeck.monitor.metric-display" })
 export class MetricDisplayAction extends SingletonAction<Settings> {
   private readonly subscriptions = new Map<string, () => void>();
   public constructor(private readonly connections: ConnectionManager) { super(); }

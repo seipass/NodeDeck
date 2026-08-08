@@ -9009,6 +9009,24 @@ var system = /*#__PURE__*/Object.freeze({
 });
 
 /**
+ * Defines a Stream Deck action associated with the plugin.
+ * @param definition The definition of the action, e.g. it's identifier, name, etc.
+ * @returns The definition decorator.
+ */
+function action(definition) {
+    const manifestId = definition.UUID;
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-unused-vars
+    return function (target, context) {
+        return class extends target {
+            /**
+             * The universally-unique value that identifies the action within the manifest.
+             */
+            manifestId = manifestId;
+        };
+    };
+}
+
+/**
  * Provides the main bridge between the plugin and the Stream Deck allowing the plugin to send requests and receive events, e.g. when the user presses an action.
  * @template T The type of settings associated with the action.
  */
@@ -14265,6 +14283,62 @@ class ConnectionManager {
     }
 }
 
+/******************************************************************************
+Copyright (c) Microsoft Corporation.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+***************************************************************************** */
+/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
+
+
+function __esDecorate(ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
+    function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
+    var kind = contextIn.kind, key = kind === "getter" ? "get" : kind === "setter" ? "set" : "value";
+    var target = !descriptorIn && ctor ? contextIn["static"] ? ctor : ctor.prototype : null;
+    var descriptor = descriptorIn || (target ? Object.getOwnPropertyDescriptor(target, contextIn.name) : {});
+    var _, done = false;
+    for (var i = decorators.length - 1; i >= 0; i--) {
+        var context = {};
+        for (var p in contextIn) context[p] = p === "access" ? {} : contextIn[p];
+        for (var p in contextIn.access) context.access[p] = contextIn.access[p];
+        context.addInitializer = function (f) { if (done) throw new TypeError("Cannot add initializers after decoration has completed"); extraInitializers.push(accept(f || null)); };
+        var result = (0, decorators[i])(kind === "accessor" ? { get: descriptor.get, set: descriptor.set } : descriptor[key], context);
+        if (kind === "accessor") {
+            if (result === void 0) continue;
+            if (result === null || typeof result !== "object") throw new TypeError("Object expected");
+            if (_ = accept(result.get)) descriptor.get = _;
+            if (_ = accept(result.set)) descriptor.set = _;
+            if (_ = accept(result.init)) initializers.unshift(_);
+        }
+        else if (_ = accept(result)) {
+            if (kind === "field") initializers.unshift(_);
+            else descriptor[key] = _;
+        }
+    }
+    if (target) Object.defineProperty(target, contextIn.name, descriptor);
+    done = true;
+}
+function __runInitializers(thisArg, initializers, value) {
+    var useValue = arguments.length > 2;
+    for (var i = 0; i < initializers.length; i++) {
+        value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
+    }
+    return useValue ? value : void 0;
+}
+typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+};
+
 function renderMetric(options, state) {
     if (state !== "online")
         return `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144"><rect width="144" height="144" fill="#20242b"/><text x="72" y="72" fill="#ffb020" text-anchor="middle" font-size="16">${escapeXml(state)}</text></svg>`;
@@ -14366,49 +14440,65 @@ function parseConnectionSettings(settings) {
     return { host, port, token: settings.token ?? "" };
 }
 
-class MetricDisplayAction extends SingletonAction {
-    connections;
-    subscriptions = new Map();
-    constructor(connections) {
-        super();
-        this.connections = connections;
-    }
-    onWillAppear(ev) { this.connect(ev.action, ev.payload.settings); }
-    onWillDisappear(ev) {
-        this.subscriptions.get(ev.action.id)?.();
-        this.subscriptions.delete(ev.action.id);
-    }
-    onDidReceiveSettings(ev) { this.connect(ev.action, ev.payload.settings); }
-    connect(action, settings) {
-        this.subscriptions.get(action.id)?.();
-        this.subscriptions.delete(action.id);
-        const connectionSettings = parseConnectionSettings(settings);
-        if (connectionSettings === undefined) {
-            void action.setImage(renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, "agent-error"));
-            return;
+let MetricDisplayAction = (() => {
+    let _classDecorators = [action({ UUID: "com.nodedeck.monitor.metric-display" })];
+    let _classDescriptor;
+    let _classExtraInitializers = [];
+    let _classThis;
+    let _classSuper = SingletonAction;
+    (class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
         }
-        const connection = this.connections.get(connectionSettings.host, connectionSettings.port, connectionSettings.token);
-        let lastState;
-        let lastValue;
-        let lastDisplayValue;
-        let lastRenderedAt = 0;
-        this.subscriptions.set(action.id, connection.on((state, snapshot) => {
-            const metric = snapshot === undefined ? undefined : selectMetric(snapshot, settings);
-            const value = metric?.value;
-            const now = Date.now();
-            if (state === lastState && value === lastValue && metric?.displayValue === lastDisplayValue)
+        connections;
+        subscriptions = new Map();
+        constructor(connections) {
+            super();
+            this.connections = connections;
+        }
+        onWillAppear(ev) { this.connect(ev.action, ev.payload.settings); }
+        onWillDisappear(ev) {
+            this.subscriptions.get(ev.action.id)?.();
+            this.subscriptions.delete(ev.action.id);
+        }
+        onDidReceiveSettings(ev) { this.connect(ev.action, ev.payload.settings); }
+        connect(action, settings) {
+            this.subscriptions.get(action.id)?.();
+            this.subscriptions.delete(action.id);
+            const connectionSettings = parseConnectionSettings(settings);
+            if (connectionSettings === undefined) {
+                void action.setImage(renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, "agent-error"));
                 return;
-            const refreshInterval = Math.max(0, settings.refreshInterval ?? 1) * 1000;
-            if (state === "online" && now - lastRenderedAt < refreshInterval)
-                return;
-            lastState = state;
-            lastValue = value;
-            lastDisplayValue = metric?.displayValue;
-            lastRenderedAt = now;
-            void action.setImage(metric === undefined ? renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, state === "online" ? "metric-unavailable" : state) : renderMetric({ label: settings.label ?? metric.label, value: metric.value, displayValue: metric.displayValue, unit: settings.unit ?? metric.unit, decimalPlaces: settings.decimalPlaces ?? 1, warningThreshold: settings.warningThreshold, criticalThreshold: settings.criticalThreshold }, state));
-        }));
-    }
-}
+            }
+            const connection = this.connections.get(connectionSettings.host, connectionSettings.port, connectionSettings.token);
+            let lastState;
+            let lastValue;
+            let lastDisplayValue;
+            let lastRenderedAt = 0;
+            this.subscriptions.set(action.id, connection.on((state, snapshot) => {
+                const metric = snapshot === undefined ? undefined : selectMetric(snapshot, settings);
+                const value = metric?.value;
+                const now = Date.now();
+                if (state === lastState && value === lastValue && metric?.displayValue === lastDisplayValue)
+                    return;
+                const refreshInterval = Math.max(0, settings.refreshInterval ?? 1) * 1000;
+                if (state === "online" && now - lastRenderedAt < refreshInterval)
+                    return;
+                lastState = state;
+                lastValue = value;
+                lastDisplayValue = metric?.displayValue;
+                lastRenderedAt = now;
+                void action.setImage(metric === undefined ? renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, state === "online" ? "metric-unavailable" : state) : renderMetric({ label: settings.label ?? metric.label, value: metric.value, displayValue: metric.displayValue, unit: settings.unit ?? metric.unit, decimalPlaces: settings.decimalPlaces ?? 1, warningThreshold: settings.warningThreshold, criticalThreshold: settings.criticalThreshold }, state));
+            }));
+        }
+    });
+    return _classThis;
+})();
 
 const connections = new ConnectionManager();
 streamDeck.actions.registerAction(new MetricDisplayAction(connections));
