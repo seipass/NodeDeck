@@ -14200,6 +14200,7 @@ class AgentConnection {
     scheduleReconnect() {
         if (this.state === "authentication-error" || this.timer !== undefined)
             return;
+        this.clearStaleTimer();
         this.state = "offline";
         this.notify();
         this.timer = setTimeout(() => {

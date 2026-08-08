@@ -81,6 +81,7 @@ export class AgentConnection {
 
   private scheduleReconnect(): void {
     if (this.state === "authentication-error" || this.timer !== undefined) return;
+    this.clearStaleTimer();
     this.state = "offline";
     this.notify();
     this.timer = setTimeout(() => {
