@@ -14194,7 +14194,11 @@ function renderMetric(options, state) {
 function selectMetric(snapshot, settings) {
     switch (settings.metricType ?? "cpu") {
         case "cpu": return { label: "CPU", value: snapshot.data.cpu.usagePercent, unit: "%" };
+        case "cpu-load1": return { label: "LOAD 1m", value: snapshot.data.cpu.load1, unit: "" };
+        case "cpu-load5": return { label: "LOAD 5m", value: snapshot.data.cpu.load5, unit: "" };
+        case "cpu-load15": return { label: "LOAD 15m", value: snapshot.data.cpu.load15, unit: "" };
         case "memory": return { label: "MEM", value: snapshot.data.memory.usedPercent, unit: "%" };
+        case "memory-swap": return { label: "SWAP", value: snapshot.data.memory.swapUsedPercent, unit: "%" };
         case "temperature": {
             const item = snapshot.data.temperature?.find((entry) => entry.sensor === settings.device) ?? snapshot.data.temperature?.[0];
             return item === undefined ? undefined : { label: item.sensor, value: item.celsius, unit: "°C" };
@@ -14203,9 +14207,21 @@ function selectMetric(snapshot, settings) {
             const item = snapshot.data.disks?.find((entry) => entry.mountpoint === settings.device) ?? snapshot.data.disks?.[0];
             return item === undefined ? undefined : { label: item.mountpoint, value: item.usedPercent, unit: "%" };
         }
+        case "disk-read": {
+            const item = snapshot.data.disks?.find((entry) => entry.mountpoint === settings.device) ?? snapshot.data.disks?.[0];
+            return item === undefined ? undefined : rateMetric(`${item.mountpoint} R`, item.readBytesPerSecond);
+        }
+        case "disk-write": {
+            const item = snapshot.data.disks?.find((entry) => entry.mountpoint === settings.device) ?? snapshot.data.disks?.[0];
+            return item === undefined ? undefined : rateMetric(`${item.mountpoint} W`, item.writeBytesPerSecond);
+        }
         case "network": {
             const item = snapshot.data.network?.find((entry) => entry.interface === settings.device) ?? snapshot.data.network?.[0];
             return item === undefined ? undefined : rateMetric(item.interface, item.rxBytesPerSecond);
+        }
+        case "network-upload": {
+            const item = snapshot.data.network?.find((entry) => entry.interface === settings.device) ?? snapshot.data.network?.[0];
+            return item === undefined ? undefined : rateMetric(`${item.interface} TX`, item.txBytesPerSecond);
         }
         case "service": {
             const item = snapshot.data.services?.find((entry) => entry.name === settings.device) ?? snapshot.data.services?.[0];

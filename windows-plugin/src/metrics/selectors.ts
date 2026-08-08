@@ -1,16 +1,23 @@
 import type { MetricSnapshot } from "../protocol/messages.js";
 
-export type MetricType = "cpu" | "memory" | "temperature" | "disk" | "network" | "service" | "docker" | "docker-cpu" | "docker-memory" | "docker-uptime" | "custom";
+export type MetricType = "cpu" | "cpu-load1" | "cpu-load5" | "cpu-load15" | "memory" | "memory-swap" | "temperature" | "disk" | "disk-read" | "disk-write" | "network" | "network-upload" | "service" | "docker" | "docker-cpu" | "docker-memory" | "docker-uptime" | "custom";
 export type MetricSettings = Readonly<{ metricType?: MetricType | undefined; device?: string | undefined; customMetricId?: string | undefined }>;
 export type SelectedMetric = Readonly<{ label: string; value: number; unit: string }>;
 
 export function selectMetric(snapshot: MetricSnapshot, settings: MetricSettings): SelectedMetric | undefined {
   switch (settings.metricType ?? "cpu") {
     case "cpu": return { label: "CPU", value: snapshot.data.cpu.usagePercent, unit: "%" };
+    case "cpu-load1": return { label: "LOAD 1m", value: snapshot.data.cpu.load1, unit: "" };
+    case "cpu-load5": return { label: "LOAD 5m", value: snapshot.data.cpu.load5, unit: "" };
+    case "cpu-load15": return { label: "LOAD 15m", value: snapshot.data.cpu.load15, unit: "" };
     case "memory": return { label: "MEM", value: snapshot.data.memory.usedPercent, unit: "%" };
+    case "memory-swap": return { label: "SWAP", value: snapshot.data.memory.swapUsedPercent, unit: "%" };
     case "temperature": { const item = snapshot.data.temperature?.find((entry) => entry.sensor === settings.device) ?? snapshot.data.temperature?.[0]; return item === undefined ? undefined : { label: item.sensor, value: item.celsius, unit: "°C" }; }
     case "disk": { const item = snapshot.data.disks?.find((entry) => entry.mountpoint === settings.device) ?? snapshot.data.disks?.[0]; return item === undefined ? undefined : { label: item.mountpoint, value: item.usedPercent, unit: "%" }; }
+    case "disk-read": { const item = snapshot.data.disks?.find((entry) => entry.mountpoint === settings.device) ?? snapshot.data.disks?.[0]; return item === undefined ? undefined : rateMetric(`${item.mountpoint} R`, item.readBytesPerSecond); }
+    case "disk-write": { const item = snapshot.data.disks?.find((entry) => entry.mountpoint === settings.device) ?? snapshot.data.disks?.[0]; return item === undefined ? undefined : rateMetric(`${item.mountpoint} W`, item.writeBytesPerSecond); }
     case "network": { const item = snapshot.data.network?.find((entry) => entry.interface === settings.device) ?? snapshot.data.network?.[0]; return item === undefined ? undefined : rateMetric(item.interface, item.rxBytesPerSecond); }
+    case "network-upload": { const item = snapshot.data.network?.find((entry) => entry.interface === settings.device) ?? snapshot.data.network?.[0]; return item === undefined ? undefined : rateMetric(`${item.interface} TX`, item.txBytesPerSecond); }
     case "service": { const item = snapshot.data.services?.find((entry) => entry.name === settings.device) ?? snapshot.data.services?.[0]; return item === undefined ? undefined : { label: item.name, value: item.activeState === "active" ? 1 : 0, unit: item.activeState }; }
     case "docker": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item === undefined ? undefined : { label: item.name, value: item.state === "running" ? 1 : 0, unit: item.state }; }
     case "docker-cpu": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item?.cpuPercent === undefined ? undefined : { label: item.name, value: item.cpuPercent, unit: "%" }; }
