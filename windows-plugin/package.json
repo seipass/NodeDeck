@@ -5,6 +5,7 @@
   "scripts": {
     "build": "rollup -c",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "validate": "streamdeck validate com.nodedeck.monitor.sdPlugin --no-update-check",
     "pack": "npm run build && npm run validate && streamdeck pack com.nodedeck.monitor.sdPlugin --output dist --no-update-check --force"
   },
@@ -20,6 +21,7 @@
     "@types/ws": "8.18.1",
     "rollup": "4.40.2",
     "tslib": "^2.8.1",
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "vitest": "3.1.2"
   }
 }

@@ -17,6 +17,12 @@ type Config struct {
 	Services      []string                `yaml:"services"`
 	Docker        bool                    `yaml:"docker"`
 	CustomMetrics map[string]CustomMetric `yaml:"custom_metrics"`
+	TLS           TLS                     `yaml:"tls"`
+}
+
+type TLS struct {
+	CertFile string `yaml:"cert_file"`
+	KeyFile  string `yaml:"key_file"`
 }
 
 type CustomMetric struct {
@@ -52,6 +58,9 @@ func Load(path string) (Config, error) {
 	}
 	if config.Update <= 0 {
 		return Config{}, errors.New("update_interval must be positive")
+	}
+	if (config.TLS.CertFile == "") != (config.TLS.KeyFile == "") {
+		return Config{}, errors.New("tls.cert_file and tls.key_file must be configured together")
 	}
 	for name, metric := range config.CustomMetrics {
 		if strings.TrimSpace(name) == "" || len(metric.Command) == 0 || !filepath.IsAbs(metric.Command[0]) || metric.Timeout <= 0 || metric.Interval <= 0 {

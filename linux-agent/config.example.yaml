@@ -7,6 +7,9 @@ services:
   - nginx.service
   - sshd.service
 docker: false
+tls:
+  cert_file: ""
+  key_file: ""
 custom_metrics:
   minecraft_players:
     command:

@@ -65,7 +65,12 @@ func run() error {
 		_ = server.Shutdown(shutdownCtx)
 	}()
 	slog.Info("agent listening", "port", settings.Listen.Port, "interval", settings.Update)
-	err := server.ListenAndServe()
+	var err error
+	if settings.TLS.CertFile != "" {
+		err = server.ListenAndServeTLS(settings.TLS.CertFile, settings.TLS.KeyFile)
+	} else {
+		err = server.ListenAndServe()
+	}
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
