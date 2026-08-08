@@ -14043,7 +14043,7 @@ function parseAgentMessage(value) {
     if (typeof value !== "object" || value === null || !("type" in value))
         return undefined;
     const candidate = value;
-    if (candidate.type === "hello_ack" || candidate.type === "metrics")
+    if (candidate.type === "hello_ack" || candidate.type === "metrics" || candidate.type === "error")
         return value;
     return undefined;
 }
@@ -14057,6 +14057,7 @@ class AgentConnection {
     state = "offline";
     listeners = new Set();
     authenticated = false;
+    staleTimer;
     constructor(url, token) {
         this.url = url;
         this.token = token;
@@ -14068,6 +14069,8 @@ class AgentConnection {
         this.socket?.close();
         this.socket = undefined;
         this.authenticated = false;
+        if (this.staleTimer !== undefined)
+            clearInterval(this.staleTimer);
     }
     on(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
     connect() {
@@ -14078,9 +14081,21 @@ class AgentConnection {
         socket.on("open", () => {
             socket.send(JSON.stringify({ type: "hello", protocol: "streamdeck-monitor", version: 1, token: this.token }));
             socket.send(JSON.stringify({ type: "subscribe", metrics: ["cpu", "memory"] }));
+            this.staleTimer = setInterval(() => { if (this.state === "online") {
+                this.state = "metric-unavailable";
+                this.notify();
+            } }, 5_000);
         });
         socket.on("message", (raw) => {
-            const message = parseAgentMessage(JSON.parse(raw.toString()));
+            let message;
+            try {
+                message = parseAgentMessage(JSON.parse(raw.toString()));
+            }
+            catch {
+                this.state = "agent-error";
+                this.notify();
+                return;
+            }
             if (message?.type === "hello_ack") {
                 this.authenticated = true;
                 this.retryMs = 1_000;
@@ -14089,11 +14104,19 @@ class AgentConnection {
             }
             if (message?.type === "metrics" && this.authenticated)
                 this.notify(message);
+            if (message?.type === "error") {
+                this.state = message.code === "AUTH_FAILED" ? "authentication-error" : "agent-error";
+                this.notify();
+                if (message.code === "AUTH_FAILED")
+                    socket.close();
+            }
         });
         socket.on("close", () => this.scheduleReconnect());
         socket.on("error", () => this.notify());
     }
     scheduleReconnect() {
+        if (this.state === "authentication-error")
+            return;
         this.state = "offline";
         this.notify();
         this.timer = setTimeout(() => this.connect(), this.retryMs);
@@ -14169,6 +14192,7 @@ function rateMetric(label, bytes) {
 
 class MetricDisplayAction extends SingletonAction {
     connections;
+    subscriptions = new Map();
     constructor(connections) {
         super();
         this.connections = connections;
@@ -14180,10 +14204,11 @@ class MetricDisplayAction extends SingletonAction {
         const port = settings.port ?? 8765;
         const token = settings.token ?? "";
         const connection = this.connections.get(host, port, token);
-        connection.on((state, snapshot) => {
+        this.subscriptions.get(action.id)?.();
+        this.subscriptions.set(action.id, connection.on((state, snapshot) => {
             const metric = snapshot === undefined ? undefined : selectMetric(snapshot, settings);
             void action.setImage(metric === undefined ? renderMetric("Metric", 0, "", state === "online" ? "metric-unavailable" : state) : renderMetric(metric.label, metric.value, metric.unit, state));
-        });
+        }));
     }
 }
 

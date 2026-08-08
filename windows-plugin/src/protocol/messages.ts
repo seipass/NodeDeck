@@ -22,11 +22,13 @@ export type HelloAck = Readonly<{
   capabilities: readonly string[];
 }>;
 
-export type AgentMessage = MetricSnapshot | HelloAck;
+export type AgentError = Readonly<{ type: "error"; code: string; message?: string; retryable?: boolean }>;
+
+export type AgentMessage = MetricSnapshot | HelloAck | AgentError;
 
 export function parseAgentMessage(value: unknown): AgentMessage | undefined {
   if (typeof value !== "object" || value === null || !("type" in value)) return undefined;
   const candidate = value as { type?: unknown };
-  if (candidate.type === "hello_ack" || candidate.type === "metrics") return value as AgentMessage;
+  if (candidate.type === "hello_ack" || candidate.type === "metrics" || candidate.type === "error") return value as AgentMessage;
   return undefined;
 }

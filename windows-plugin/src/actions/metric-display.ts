@@ -6,6 +6,7 @@ import { selectMetric, type MetricSettings } from "../metrics/selectors.js";
 type Settings = Readonly<{ host?: string; port?: number; token?: string; metricType?: MetricSettings["metricType"]; device?: string; customMetricId?: string }>;
 
 export class MetricDisplayAction extends SingletonAction<Settings> {
+  private readonly subscriptions = new Map<string, () => void>();
   public constructor(private readonly connections: ConnectionManager) { super(); }
 
   public override onWillAppear(ev: WillAppearEvent<Settings>): void { this.connect(ev.action, ev.payload.settings); }
@@ -15,9 +16,10 @@ export class MetricDisplayAction extends SingletonAction<Settings> {
     const port = settings.port ?? 8765;
     const token = settings.token ?? "";
     const connection = this.connections.get(host, port, token);
-    connection.on((state, snapshot) => {
+    this.subscriptions.get(action.id)?.();
+    this.subscriptions.set(action.id, connection.on((state, snapshot) => {
       const metric = snapshot === undefined ? undefined : selectMetric(snapshot, settings);
       void action.setImage(metric === undefined ? renderMetric("Metric", 0, "", state === "online" ? "metric-unavailable" : state) : renderMetric(metric.label, metric.value, metric.unit, state));
-    });
+    }));
   }
 }
