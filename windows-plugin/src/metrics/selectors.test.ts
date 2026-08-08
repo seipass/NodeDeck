@@ -19,4 +19,8 @@ describe("selectMetric", () => {
     expect(selectMetric(snapshot, { metricType: "docker-memory", device: "web" })).toEqual({ label: "web", value: 2, unit: "MB" });
     expect(selectMetric(snapshot, { metricType: "docker-uptime", device: "web" })).toEqual({ label: "web", value: 65, unit: "s" });
   });
+  it("preserves nonnumeric custom metric output for display", () => {
+    const customSnapshot: MetricSnapshot = { ...snapshot, data: { ...snapshot.data, custom: [{ id: "status", status: "ok", value: "online", exitCode: 0 }] } };
+    expect(selectMetric(customSnapshot, { metricType: "custom", customMetricId: "status" })).toEqual({ label: "status", value: 0, displayValue: "online", unit: "" });
+  });
 });

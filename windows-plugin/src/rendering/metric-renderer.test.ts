@@ -6,4 +6,5 @@ describe("renderMetric", () => {
   it("renders critical color at threshold", () => { expect(renderMetric({ label: "CPU", value: 95, unit: "%", decimalPlaces: 0, criticalThreshold: 90 }, "online")).toContain("#ef4444"); });
   it("renders state instead of stale value offline", () => { const svg = renderMetric({ label: "CPU", value: 42.5, unit: "%", decimalPlaces: 1 }, "offline"); expect(svg).toContain("offline"); expect(svg).not.toContain("42.5%"); });
   it("escapes user-controlled SVG text", () => { const svg = renderMetric({ label: "<CPU>", value: 1, unit: "&", decimalPlaces: 0 }, "online"); expect(svg).toContain("&lt;CPU&gt;"); expect(svg).toContain("1&amp;"); expect(svg).not.toContain("<CPU>"); });
+  it("renders custom text output", () => { expect(renderMetric({ label: "Players", value: 0, displayValue: "online", unit: "", decimalPlaces: 0 }, "online")).toContain(">online<"); });
 });

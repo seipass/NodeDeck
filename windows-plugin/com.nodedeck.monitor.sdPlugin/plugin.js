@@ -14228,7 +14228,8 @@ function renderMetric(options, state) {
         return `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144"><rect width="144" height="144" fill="#20242b"/><text x="72" y="72" fill="#ffb020" text-anchor="middle" font-size="16">${escapeXml(state)}</text></svg>`;
     const bounded = Math.max(0, Math.min(100, options.value));
     const color = options.criticalThreshold !== undefined && options.value >= options.criticalThreshold ? "#ef4444" : options.warningThreshold !== undefined && options.value >= options.warningThreshold ? "#f59e0b" : "#4ade80";
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144"><rect width="144" height="144" fill="#20242b"/><text x="12" y="24" fill="#fff" font-size="16">${escapeXml(options.label)}</text><text x="72" y="82" fill="#fff" text-anchor="middle" font-size="34">${options.value.toFixed(Math.max(0, Math.min(6, options.decimalPlaces)))}${escapeXml(options.unit)}</text><rect x="12" y="112" width="120" height="8" rx="4" fill="#48515c"/><rect x="12" y="112" width="${1.2 * bounded}" height="8" rx="4" fill="${color}"/></svg>`;
+    const text = options.displayValue ?? `${options.value.toFixed(Math.max(0, Math.min(6, options.decimalPlaces)))}${options.unit}`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144"><rect width="144" height="144" fill="#20242b"/><text x="12" y="24" fill="#fff" font-size="16">${escapeXml(options.label)}</text><text x="72" y="82" fill="#fff" text-anchor="middle" font-size="34">${escapeXml(text)}</text><rect x="12" y="112" width="120" height="8" rx="4" fill="#48515c"/><rect x="12" y="112" width="${1.2 * bounded}" height="8" rx="4" fill="${color}"/></svg>`;
 }
 function escapeXml(value) {
     return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character] ?? character);
@@ -14288,10 +14289,10 @@ function selectMetric(snapshot, settings) {
         }
         case "custom": {
             const item = snapshot.data.custom?.find((entry) => entry.id === settings.customMetricId);
-            if (item === undefined || item.status !== "ok")
+            if (item === undefined || item.status !== "ok" || item.value === undefined)
                 return undefined;
-            const value = Number(item.value ?? 0);
-            return Number.isFinite(value) ? { label: item.id, value, unit: "" } : undefined;
+            const value = Number(item.value);
+            return { label: item.id, value: Number.isFinite(value) ? value : 0, displayValue: item.value, unit: "" };
         }
         default: return undefined;
     }
@@ -14347,7 +14348,7 @@ class MetricDisplayAction extends SingletonAction {
             lastState = state;
             lastValue = value;
             lastRenderedAt = now;
-            void action.setImage(metric === undefined ? renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, state === "online" ? "metric-unavailable" : state) : renderMetric({ label: settings.label ?? metric.label, value: metric.value, unit: settings.unit ?? metric.unit, decimalPlaces: settings.decimalPlaces ?? 1, warningThreshold: settings.warningThreshold, criticalThreshold: settings.criticalThreshold }, state));
+            void action.setImage(metric === undefined ? renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, state === "online" ? "metric-unavailable" : state) : renderMetric({ label: settings.label ?? metric.label, value: metric.value, displayValue: metric.displayValue, unit: settings.unit ?? metric.unit, decimalPlaces: settings.decimalPlaces ?? 1, warningThreshold: settings.warningThreshold, criticalThreshold: settings.criticalThreshold }, state));
         }));
     }
 }

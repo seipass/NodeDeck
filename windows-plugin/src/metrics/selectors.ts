@@ -2,7 +2,7 @@ import type { MetricSnapshot } from "../protocol/messages.js";
 
 export type MetricType = "cpu" | "cpu-load1" | "cpu-load5" | "cpu-load15" | "memory" | "memory-swap" | "temperature" | "disk" | "disk-read" | "disk-write" | "network" | "network-upload" | "service" | "docker" | "docker-cpu" | "docker-memory" | "docker-uptime" | "custom";
 export type MetricSettings = Readonly<{ metricType?: MetricType | undefined; device?: string | undefined; customMetricId?: string | undefined }>;
-export type SelectedMetric = Readonly<{ label: string; value: number; unit: string }>;
+export type SelectedMetric = Readonly<{ label: string; value: number; displayValue?: string; unit: string }>;
 
 export function selectMetric(snapshot: MetricSnapshot, settings: MetricSettings): SelectedMetric | undefined {
   switch (settings.metricType ?? "cpu") {
@@ -23,7 +23,7 @@ export function selectMetric(snapshot: MetricSnapshot, settings: MetricSettings)
     case "docker-cpu": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item?.cpuPercent === undefined ? undefined : { label: item.name, value: item.cpuPercent, unit: "%" }; }
     case "docker-memory": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item?.memoryUsageBytes === undefined ? undefined : bytesMetric(item.name, item.memoryUsageBytes); }
     case "docker-uptime": { const item = snapshot.data.docker?.find((entry) => entry.name === settings.device) ?? snapshot.data.docker?.[0]; return item?.uptimeSeconds === undefined ? undefined : { label: item.name, value: item.uptimeSeconds, unit: "s" }; }
-    case "custom": { const item = snapshot.data.custom?.find((entry) => entry.id === settings.customMetricId); if (item === undefined || item.status !== "ok") return undefined; const value = Number(item.value ?? 0); return Number.isFinite(value) ? { label: item.id, value, unit: "" } : undefined; }
+    case "custom": { const item = snapshot.data.custom?.find((entry) => entry.id === settings.customMetricId); if (item === undefined || item.status !== "ok" || item.value === undefined) return undefined; const value = Number(item.value); return { label: item.id, value: Number.isFinite(value) ? value : 0, displayValue: item.value, unit: "" }; }
     default: return undefined;
   }
 }
