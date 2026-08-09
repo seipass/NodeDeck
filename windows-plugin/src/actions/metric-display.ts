@@ -56,6 +56,7 @@ export class MetricDisplayAction extends SingletonAction<Settings> {
   }
 
   private render(action: WillAppearEvent<Settings>["action"], image: string, title: string): void {
-    void action.setImage(image).catch(() => action.setTitle(title).catch(() => undefined));
+    void action.setImage(image).catch(() => undefined);
+    void action.setTitle(title).catch(() => undefined);
   }
 }

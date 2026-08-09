@@ -14508,7 +14508,8 @@ let MetricDisplayAction = (() => {
             }));
         }
         render(action, image, title) {
-            void action.setImage(image).catch(() => action.setTitle(title).catch(() => undefined));
+            void action.setImage(image).catch(() => undefined);
+            void action.setTitle(title).catch(() => undefined);
         }
     });
     return _classThis;
