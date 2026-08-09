@@ -14164,7 +14164,11 @@ class AgentConnection {
         this.authenticated = false;
         this.clearStaleTimer();
     }
-    on(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+    on(listener) {
+        this.listeners.add(listener);
+        listener(this.state, this.metricStore.get());
+        return () => this.listeners.delete(listener);
+    }
     getSnapshot() { return this.metricStore.get(); }
     connect() {
         const generation = ++this.generation;
@@ -14183,10 +14187,7 @@ class AgentConnection {
                 this.notify();
                 socket.close();
             }, 5_000);
-            this.staleTimer = setInterval(() => { if (this.state === "online") {
-                this.state = "metric-unavailable";
-                this.notify();
-            } }, 5_000);
+            this.armStaleTimer(generation);
         });
         socket.on("message", (raw) => {
             if (generation !== this.generation)
@@ -14212,6 +14213,7 @@ class AgentConnection {
             if (message?.type === "metrics" && this.authenticated) {
                 this.metricStore.update(message);
                 this.state = "online";
+                this.armStaleTimer(generation);
                 this.notify(this.metricStore.get());
             }
             if (message?.type === "error") {
@@ -14243,9 +14245,18 @@ class AgentConnection {
         listener(this.state, snapshot); }
     clearStaleTimer() {
         if (this.staleTimer !== undefined) {
-            clearInterval(this.staleTimer);
+            clearTimeout(this.staleTimer);
             this.staleTimer = undefined;
         }
+    }
+    armStaleTimer(generation) {
+        this.clearStaleTimer();
+        this.staleTimer = setTimeout(() => {
+            if (generation !== this.generation || this.state !== "online")
+                return;
+            this.state = "metric-unavailable";
+            this.notify();
+        }, 5_000);
     }
     clearHandshakeTimer() {
         if (this.handshakeTimer !== undefined) {
@@ -14267,8 +14278,10 @@ class ConnectionManager {
         const key = `${host}:${port}`;
         const existing = this.connections.get(key);
         if (existing !== undefined) {
-            if (existing.getToken() === token)
+            if (existing.getToken() === token) {
+                existing.start();
                 return existing;
+            }
             existing.stop();
             this.connections.delete(key);
         }

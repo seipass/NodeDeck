@@ -45,7 +45,11 @@ export class AgentConnection {
     this.clearStaleTimer();
   }
 
-  public on(listener: Listener): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+  public on(listener: Listener): () => void {
+    this.listeners.add(listener);
+    listener(this.state, this.metricStore.get());
+    return () => this.listeners.delete(listener);
+  }
 
   public getSnapshot(): MetricSnapshot | undefined { return this.metricStore.get(); }
 
@@ -64,7 +68,7 @@ export class AgentConnection {
         this.notify();
         socket.close();
       }, 5_000);
-      this.staleTimer = setInterval(() => { if (this.state === "online") { this.state = "metric-unavailable"; this.notify(); } }, 5_000);
+      this.armStaleTimer(generation);
     });
     socket.on("message", (raw: Buffer) => {
       if (generation !== this.generation) return;
@@ -81,6 +85,7 @@ export class AgentConnection {
       if (message?.type === "metrics" && this.authenticated) {
         this.metricStore.update(message);
         this.state = "online";
+        this.armStaleTimer(generation);
         this.notify(this.metricStore.get());
       }
       if (message?.type === "error") { this.state = message.code === "AUTH_FAILED" ? "authentication-error" : "agent-error"; this.notify(); if (message.code === "AUTH_FAILED") socket.close(); }
@@ -106,9 +111,18 @@ export class AgentConnection {
 
   private clearStaleTimer(): void {
     if (this.staleTimer !== undefined) {
-      clearInterval(this.staleTimer);
+      clearTimeout(this.staleTimer);
       this.staleTimer = undefined;
     }
+  }
+
+  private armStaleTimer(generation: number): void {
+    this.clearStaleTimer();
+    this.staleTimer = setTimeout(() => {
+      if (generation !== this.generation || this.state !== "online") return;
+      this.state = "metric-unavailable";
+      this.notify();
+    }, 5_000);
   }
 
   private clearHandshakeTimer(): void {
