@@ -14472,7 +14472,7 @@ let MetricDisplayAction = (() => {
             this.subscriptions.delete(action.id);
             const connectionSettings = parseConnectionSettings(settings);
             if (connectionSettings === undefined) {
-                void action.setImage(renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, "agent-error"));
+                this.render(action, renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, "agent-error"), "Agent error");
                 return;
             }
             const connection = this.connections.get(connectionSettings.host, connectionSettings.port, connectionSettings.token);
@@ -14493,8 +14493,13 @@ let MetricDisplayAction = (() => {
                 lastValue = value;
                 lastDisplayValue = metric?.displayValue;
                 lastRenderedAt = now;
-                void action.setImage(metric === undefined ? renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, state === "online" ? "metric-unavailable" : state) : renderMetric({ label: settings.label ?? metric.label, value: metric.value, displayValue: metric.displayValue, unit: settings.unit ?? metric.unit, decimalPlaces: settings.decimalPlaces ?? 1, warningThreshold: settings.warningThreshold, criticalThreshold: settings.criticalThreshold }, state));
+                const image = metric === undefined ? renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, state === "online" ? "metric-unavailable" : state) : renderMetric({ label: settings.label || metric.label, value: metric.value, displayValue: metric.displayValue, unit: settings.unit || metric.unit, decimalPlaces: settings.decimalPlaces ?? 1, warningThreshold: settings.warningThreshold, criticalThreshold: settings.criticalThreshold }, state);
+                const title = metric === undefined ? state : `${settings.label || metric.label}\n${metric.displayValue ?? `${metric.value.toFixed(settings.decimalPlaces ?? 1)}${settings.unit || metric.unit}`}`;
+                this.render(action, image, title);
             }));
+        }
+        render(action, image, title) {
+            void action.setImage(image).catch(() => action.setTitle(title).catch(() => undefined));
         }
     });
     return _classThis;
