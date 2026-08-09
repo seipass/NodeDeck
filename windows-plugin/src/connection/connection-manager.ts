@@ -7,7 +7,10 @@ export class ConnectionManager {
     const key = `${host}:${port}`;
     const existing = this.connections.get(key);
     if (existing !== undefined) {
-      if (existing.getToken() === token) return existing;
+      if (existing.getToken() === token) {
+        existing.start();
+        return existing;
+      }
       existing.stop();
       this.connections.delete(key);
     }
