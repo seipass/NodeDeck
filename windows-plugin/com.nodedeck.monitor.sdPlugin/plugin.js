@@ -14462,6 +14462,15 @@ let MetricDisplayAction = (() => {
             this.connections = connections;
         }
         onWillAppear(ev) { this.connect(ev.action, ev.payload.settings); }
+        async onKeyDown(ev) {
+            await ev.action.setTitle("Connecting...").catch(() => undefined);
+            try {
+                this.connect(ev.action, await ev.action.getSettings());
+            }
+            catch {
+                this.render(ev.action, renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, "agent-error"), "Agent error");
+            }
+        }
         onWillDisappear(ev) {
             this.subscriptions.get(ev.action.id)?.();
             this.subscriptions.delete(ev.action.id);

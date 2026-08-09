@@ -1,4 +1,4 @@
-import { action, SingletonAction, type WillAppearEvent, type WillDisappearEvent, type DidReceiveSettingsEvent } from "@elgato/streamdeck";
+import { action, SingletonAction, type KeyDownEvent, type WillAppearEvent, type WillDisappearEvent, type DidReceiveSettingsEvent } from "@elgato/streamdeck";
 import type { ConnectionManager } from "../connection/connection-manager.js";
 import { renderMetric } from "../rendering/metric-renderer.js";
 import { selectMetric, type MetricSettings } from "../metrics/selectors.js";
@@ -12,6 +12,14 @@ export class MetricDisplayAction extends SingletonAction<Settings> {
   public constructor(private readonly connections: ConnectionManager) { super(); }
 
   public override onWillAppear(ev: WillAppearEvent<Settings>): void { this.connect(ev.action, ev.payload.settings); }
+  public override async onKeyDown(ev: KeyDownEvent<Settings>): Promise<void> {
+    await ev.action.setTitle("Connecting...").catch(() => undefined);
+    try {
+      this.connect(ev.action, await ev.action.getSettings());
+    } catch {
+      this.render(ev.action, renderMetric({ label: "Metric", value: 0, unit: "", decimalPlaces: 1 }, "agent-error"), "Agent error");
+    }
+  }
   public override onWillDisappear(ev: WillDisappearEvent<Settings>): void {
     this.subscriptions.get(ev.action.id)?.();
     this.subscriptions.delete(ev.action.id);
